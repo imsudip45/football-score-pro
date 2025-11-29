@@ -1504,8 +1504,18 @@ class PlayOnTab(QWidget):
             "home": set(),
             "away": set()
         }
+        # Track officials who have been sent off (handled by name because no jersey numbers)
+        self.sent_off_officials = {
+            "home": set(),
+            "away": set()
+        }
         # Track which players are currently flagged from cards tables (direct red or double yellow)
         self.cards_sent_off_players = {
+            "home": set(),
+            "away": set()
+        }
+        # Track card-driven sent-off officials separately so we can detect removals
+        self.cards_sent_off_officials = {
             "home": set(),
             "away": set()
         }
@@ -3561,7 +3571,7 @@ class PlayOnTab(QWidget):
                 player_table.setItem(row_idx, 0, sep)
                 player_table.setSpan(row_idx, 0, 1, 5)
                 row_idx += 1
-
+                sent_off_officials = self.sent_off_officials.get(team_type, set())
                 # Populate officials
                 for key in official_keys:
                     official_name = team_data.get(key)
@@ -3594,6 +3604,13 @@ class PlayOnTab(QWidget):
                         if r_count >= 1 or y_count >= 2:
                             for it in (name_item, number_item, position_item, y_item, r_item):
                                 it.setFlags(Qt.ItemFlag.NoItemFlags)
+
+                    if official_name in sent_off_officials:
+                        tooltip = "Sent off — official is no longer available."
+                        for it in (name_item, number_item, position_item, y_item, r_item):
+                            it.setForeground(QColor("#FF0000"))
+                            it.setFlags(Qt.ItemFlag.NoItemFlags)
+                            it.setToolTip(tooltip)
 
                     player_table.setItem(row_idx, 0, name_item)
                     player_table.setItem(row_idx, 1, number_item)
@@ -5547,8 +5564,14 @@ class PlayOnTab(QWidget):
                 if num_item:
                     jersey_no = num_item.text().strip()
                 self._set_card_row_sent_off_state(table, row, True)
-                if jersey_no:
-                    self._mark_player_sent_off(team_type, jersey_no, True)
+                entity_type = "player" if jersey_no else "official"
+                self._mark_player_sent_off(
+                    team_type,
+                    jersey_no,
+                    True,
+                    player_name=player_name,
+                    entity_type=entity_type,
+                )
                         
             else:
                 # Red card was removed
@@ -5560,8 +5583,14 @@ class PlayOnTab(QWidget):
                 if num_item:
                     jersey_no = num_item.text().strip()
                 self._set_card_row_sent_off_state(table, row, False)
-                if jersey_no:
-                    self._mark_player_sent_off(team_type, jersey_no, False)
+                entity_type = "player" if jersey_no else "official"
+                self._mark_player_sent_off(
+                    team_type,
+                    jersey_no,
+                    False,
+                    player_name=player_name,
+                    entity_type=entity_type,
+                )
                 
         except Exception as e:
             print(f"Error in on_red_card_changed: {e}")
@@ -5576,17 +5605,37 @@ class PlayOnTab(QWidget):
         except Exception as exc:
             print(f"Error highlighting card row {row}: {exc}")
 
-    def _mark_player_sent_off(self, team_type: str, jersey_no: str, sent_off: bool):
-        """Notify other tabs that a player has been sent off so they can lock them."""
+    def _mark_player_sent_off(
+        self,
+        team_type: str,
+        jersey_no: str,
+        sent_off: bool,
+        player_name: str | None = None,
+        entity_type: str | None = None,
+    ):
+        """Notify other tabs that a player or official has been sent off."""
         try:
-            if not jersey_no:
+            if not team_type:
                 return
             normalized = "home" if str(team_type).lower().startswith("home") else "away"
-            player_set = self.sent_off_players.setdefault(normalized, set())
-            if sent_off:
-                player_set.add(jersey_no)
-            else:
-                player_set.discard(jersey_no)
+            resolved_type = entity_type
+            if resolved_type not in {"player", "official"}:
+                resolved_type = "player" if jersey_no else "official"
+            if not jersey_no and not player_name:
+                return
+
+            if resolved_type == "player" and jersey_no:
+                player_set = self.sent_off_players.setdefault(normalized, set())
+                if sent_off:
+                    player_set.add(jersey_no)
+                else:
+                    player_set.discard(jersey_no)
+            elif resolved_type == "official" and player_name:
+                official_set = self.sent_off_officials.setdefault(normalized, set())
+                if sent_off:
+                    official_set.add(player_name)
+                else:
+                    official_set.discard(player_name)
 
             main_window = self.window()
             if not main_window:
@@ -5594,9 +5643,15 @@ class PlayOnTab(QWidget):
             subs_tab = getattr(main_window, "subs_penalty_tab", None)
             if subs_tab and hasattr(subs_tab, "handle_sent_off_player_from_play_on"):
                 try:
-                    subs_tab.handle_sent_off_player_from_play_on(normalized, jersey_no, sent_off)
+                    subs_tab.handle_sent_off_player_from_play_on(
+                        normalized,
+                        jersey_no,
+                        sent_off,
+                        player_name=player_name,
+                        entity_type=resolved_type,
+                    )
                 except Exception as handler_exc:
-                    print(f"Error notifying Subs & Penalty tab about sent off player: {handler_exc}")
+                    print(f"Error notifying Subs & Penalty tab about sent off entity: {handler_exc}")
         except Exception as exc:
             print(f"Error tracking sent off player: {exc}")
 
@@ -5873,9 +5928,9 @@ class PlayOnTab(QWidget):
                 # Count yellows per player so promotion applies per-player, not globally
                 yellows_per_player = {}
                 player_meta = {}
-                direct_red_nums = set()
+                direct_red_entities = []
                 if not tbl:
-                    return 0, 0, 0, set(), set()
+                    return 0, 0, 0, [], []
                 for i in range(tbl.rowCount()):
                     # Player identity: prefer jersey number + name
                     num_item = tbl.item(i, 1)
@@ -5883,7 +5938,7 @@ class PlayOnTab(QWidget):
                     name_btn = tbl.cellWidget(i, 2)
                     name_text = name_btn.text().strip() if name_btn else ""
                     player_key = f"{num_text}|{name_text}" if (num_text or name_text) else f"row{i}"
-                    player_meta[player_key] = {"num": num_text}
+                    player_meta[player_key] = {"num": num_text, "name": name_text}
 
                     # Yellow
                     yw = tbl.cellWidget(i, 3)
@@ -5899,23 +5954,27 @@ class PlayOnTab(QWidget):
                         rcb = rw.findChild(QCheckBox)
                         if rcb and rcb.isChecked():
                             direct_red += 1
-                            if num_text:
-                                direct_red_nums.add(num_text)
+                            direct_red_entities.append({"num": num_text, "name": name_text})
 
                 promoted_red = sum(count // 2 for count in yellows_per_player.values())
-                double_yellow_nums = {
-                    player_meta[key]["num"]
-                    for key, count in yellows_per_player.items()
-                    if count >= 2 and player_meta.get(key, {}).get("num")
-                }
-                return total_yellow, direct_red, promoted_red, direct_red_nums, double_yellow_nums
+                double_yellow_entities = []
+                for key, count in yellows_per_player.items():
+                    if count >= 2:
+                        meta = player_meta.get(key, {})
+                        double_yellow_entities.append(
+                            {
+                                "num": meta.get("num", ""),
+                                "name": meta.get("name", ""),
+                            }
+                        )
+                return total_yellow, direct_red, promoted_red, direct_red_entities, double_yellow_entities
 
             tbl = self.home_card_table if team_type == 'home' else self.away_card_table
             prev_y = self.stats_data.get(f'{team_type}_yellow_cards', 0)
             prev_r = self.stats_data.get(f'{team_type}_red_cards', 0)
             prev_total_cards = prev_y + prev_r
 
-            y_count, r_direct, r_promoted, direct_red_nums, double_yellow_nums = count_cards_with_promotion(tbl)
+            y_count, r_direct, r_promoted, direct_red_entities, double_yellow_entities = count_cards_with_promotion(tbl)
             # Only promote pairs of yellows for the same player
             r_count = r_direct + r_promoted
             total_cards = y_count + r_count
@@ -5937,7 +5996,8 @@ class PlayOnTab(QWidget):
                 self.update_stat_display('fouls', team_type)
 
             # Apply sent-off state to substitution tab based on cards
-            self._apply_cards_sent_off(team_type, direct_red_nums.union(double_yellow_nums))
+            sent_off_entities = list(direct_red_entities) + list(double_yellow_entities)
+            self._apply_cards_sent_off(team_type, sent_off_entities)
 
             try:
                 print(
@@ -5950,17 +6010,35 @@ class PlayOnTab(QWidget):
         except Exception as e:
             print(f"Error update_card_stats: {e}")
 
-    def _apply_cards_sent_off(self, team_type: str, current_sent_off: set):
+    def _apply_cards_sent_off(self, team_type: str, current_sent_off_entities: list[dict]):
         """Ensure sent-off state from cards (direct reds or double yellows) stays in sync across tabs."""
         try:
-            previous = self.cards_sent_off_players.get(team_type, set())
-            to_add = current_sent_off - previous
-            to_remove = previous - current_sent_off
-            for jersey in to_add:
-                self._mark_player_sent_off(team_type, jersey, True)
-            for jersey in to_remove:
-                self._mark_player_sent_off(team_type, jersey, False)
-            self.cards_sent_off_players[team_type] = set(current_sent_off)
+            current_numbers = {
+                entity.get("num")
+                for entity in current_sent_off_entities
+                if entity.get("num")
+            }
+            current_names = {
+                entity.get("name")
+                for entity in current_sent_off_entities
+                if not entity.get("num") and entity.get("name")
+            }
+
+            previous_numbers = self.cards_sent_off_players.get(team_type, set())
+            previous_names = self.cards_sent_off_officials.get(team_type, set())
+
+            for jersey in current_numbers - previous_numbers:
+                self._mark_player_sent_off(team_type, jersey, True, entity_type="player")
+            for jersey in previous_numbers - current_numbers:
+                self._mark_player_sent_off(team_type, jersey, False, entity_type="player")
+
+            for name in current_names - previous_names:
+                self._mark_player_sent_off(team_type, "", True, player_name=name, entity_type="official")
+            for name in previous_names - current_names:
+                self._mark_player_sent_off(team_type, "", False, player_name=name, entity_type="official")
+
+            self.cards_sent_off_players[team_type] = set(current_numbers)
+            self.cards_sent_off_officials[team_type] = set(current_names)
         except Exception as exc:
             print(f"Error applying cards sent off state: {exc}")
 
