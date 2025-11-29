@@ -6224,23 +6224,36 @@ class PlayOnTab(QWidget):
             if button in self.button_animators:
                 animator = self.button_animators[button]
 
-                # Create animation for font size
+                # Create animation for font size increase
                 animation = QPropertyAnimation(animator, b"fontSize")
                 animation.setDuration(150)  # 150ms animation
                 animation.setStartValue(animator.original_size)
                 animation.setEndValue(animator.original_size + 5)  # Increase by 5
                 animation.setEasingCurve(QEasingCurve.OutQuad)
 
-                # Return to original size
-                def return_to_original():
-                    return_animation = QPropertyAnimation(animator, b"fontSize")
-                    return_animation.setDuration(150)
-                    return_animation.setStartValue(animator.original_size + 5)
-                    return_animation.setEndValue(animator.original_size)
-                    return_animation.setEasingCurve(QEasingCurve.InQuad)
-                    return_animation.start()
+                # Create return animation (stored to prevent garbage collection)
+                return_animation = QPropertyAnimation(animator, b"fontSize")
+                return_animation.setDuration(150)
+                return_animation.setStartValue(animator.original_size + 5)
+                return_animation.setEndValue(animator.original_size)
+                return_animation.setEasingCurve(QEasingCurve.InQuad)
 
-                animation.finished.connect(return_to_original)
+                # Store animations to prevent garbage collection
+                # Use button as key to allow only one animation per button at a time
+                if not hasattr(self, "_active_animations"):
+                    self._active_animations = {}
+                self._active_animations[button] = (animation, return_animation)
+
+                # Connect: when expand finishes, start return animation
+                animation.finished.connect(return_animation.start)
+
+                # Clean up references when fully complete
+                def cleanup():
+                    if button in self._active_animations:
+                        del self._active_animations[button]
+
+                return_animation.finished.connect(cleanup)
+
                 animation.start()
 
         except Exception as e:
