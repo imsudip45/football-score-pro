@@ -173,11 +173,25 @@ class ModernButton(QPushButton):
         super().__init__(text, parent)
         self.style_type = style_type
         self.font_size = font_size
+        self._custom_stylesheet = None
         self.setMinimumHeight(35)
         self.setCursor(Qt.PointingHandCursor)
         self.apply_style()
 
+    def set_custom_stylesheet(self, stylesheet):
+        """Set a custom stylesheet that won't be overridden by apply_style()"""
+        self._custom_stylesheet = stylesheet
+        if stylesheet:
+            self.setStyleSheet(stylesheet)
+        else:
+            self.apply_style()
+
     def apply_style(self):
+        # If custom stylesheet is set, don't override it
+        if self._custom_stylesheet:
+            self.setStyleSheet(self._custom_stylesheet)
+            return
+
         styles = {
             "primary": f"""
                 QPushButton {{
@@ -5619,8 +5633,9 @@ class PlayOnTab(QWidget):
                 color: white;
                 border: 2px solid #1e40af;
                 border-radius: 6px;
-                padding: 6px 10px;
+                padding: 4px 8px;
                 font-weight: bold;
+                font-size: 14px;
             }}
         """)
 

@@ -4,20 +4,25 @@ Contains formation selector, kit selector, jersey image, and color panel
 Migrated from team_panel.py to centralize control panel functionality
 """
 
-import os
 import re
 import traceback
 from pathlib import Path
 from typing import Optional
+
+from PySide6.QtCore import QRegularExpression, Qt, Signal
+from PySide6.QtGui import QColor, QPixmap, QRegularExpressionValidator
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFrame, QLabel,
-    QLineEdit, QPushButton, QSizePolicy, QMessageBox, QGraphicsOpacityEffect
+    QFrame,
+    QGraphicsOpacityEffect,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
 )
-from PySide6.QtCore import Qt, Signal, QRegularExpression
-from PySide6.QtGui import QPixmap, QColor, QRegularExpressionValidator
-from .modern_components import ModernButton, ModernLabel
+
 from .color_panel import ColorPanel
-from .color_utils import extract_top_colors, extract_bottom_left_color
+from .color_utils import extract_bottom_left_color, extract_top_colors
 
 
 class ControlPanel(QFrame):
@@ -43,7 +48,7 @@ class ControlPanel(QFrame):
         self.app_logo_label = None
         self._formation_formatting = False
         self._last_valid_formation = "Select Formation"
-        
+
         self.setup_ui()
         self.connect_signals()
 
@@ -51,7 +56,7 @@ class ControlPanel(QFrame):
         """Setup the control panel UI - migrated from team_panel.create_control_panel()"""
         # Set the outer border style for the control panel widget
         self.setStyleSheet(self.get_panel_style("control"))
-        
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(2, 2, 2, 2)
         layout.setSpacing(4)
@@ -69,7 +74,9 @@ class ControlPanel(QFrame):
         self.formation_input.setMaxLength(7)  # allow digits + dashes when formatted
         self.formation_input.setStyleSheet(self.get_lineedit_style())
         regex = QRegularExpression(r"[0-9\-]{0,7}")
-        self.formation_validator = QRegularExpressionValidator(regex, self.formation_input)
+        self.formation_validator = QRegularExpressionValidator(
+            regex, self.formation_input
+        )
         self.formation_input.setValidator(self.formation_validator)
         formation_layout.addWidget(self.formation_input)
 
@@ -90,7 +97,9 @@ class ControlPanel(QFrame):
         kit_label.setFrameShadow(QFrame.Plain)
         kit_label.setLineWidth(0)
         kit_label.setMidLineWidth(0)
-        kit_label.setStyleSheet(self.get_label_style() + """
+        kit_label.setStyleSheet(
+            self.get_label_style()
+            + """
             QLabel {
                 border: none;
                 border-width: 0px;
@@ -98,12 +107,14 @@ class ControlPanel(QFrame):
                 outline: none;
                 margin: 0px;
             }
-        """)
+        """
+        )
         kit_layout.addWidget(kit_label)
 
         # Kit selector button (cycles through kits)
         self.kit_button = QPushButton("No kits loaded")
-        self.kit_button.setStyleSheet(self.get_combobox_style())
+        self.kit_button.setStyleSheet(self.get_kit_button_style())
+        self.kit_button.setMinimumHeight(38)  # Set minimum height for better visibility
         self.kit_button.setEnabled(False)  # Disabled until kits are loaded from JSON
         self.kit_button.clicked.connect(self.cycle_kit)
         kit_layout.addWidget(self.kit_button)
@@ -174,7 +185,9 @@ class ControlPanel(QFrame):
         try:
             self.app_logo_label = QLabel()
             self.app_logo_label.setAlignment(Qt.AlignCenter)
-            self.app_logo_label.setStyleSheet("QLabel { background: transparent; border: none; }")
+            self.app_logo_label.setStyleSheet(
+                "QLabel { background: transparent; border: none; }"
+            )
             self.app_logo_label.setFixedHeight(200)
             self.app_logo_label.setFixedWidth(140)
             logo_path = Path("resources/images") / "app logo.png"
@@ -185,7 +198,9 @@ class ControlPanel(QFrame):
                     scaled = pix.scaledToHeight(target_h, Qt.SmoothTransformation)
                     self.app_logo_label.setPixmap(scaled)
                     logo_opacity = QGraphicsOpacityEffect(self.app_logo_label)
-                    logo_opacity.setOpacity(0.3)  # 0.0 = fully transparent, 1.0 = opaque
+                    logo_opacity.setOpacity(
+                        0.3
+                    )  # 0.0 = fully transparent, 1.0 = opaque
                     self.app_logo_label.setGraphicsEffect(logo_opacity)
             layout.addWidget(self.app_logo_label)
         except Exception:
@@ -196,7 +211,9 @@ class ControlPanel(QFrame):
     def connect_signals(self):
         """Connect all signals"""
         if self.formation_input:
-            self.formation_input.editingFinished.connect(self.on_formation_text_committed)
+            self.formation_input.editingFinished.connect(
+                self.on_formation_text_committed
+            )
         if self.color_panel:
             self.color_panel.color_changed.connect(self.on_color_changed)
 
@@ -242,7 +259,10 @@ class ControlPanel(QFrame):
     def _validate_formation_digits(formatted: str) -> tuple[bool, str]:
         digits = formatted.split("-")
         if not (1 <= len(digits) <= 5):
-            return False, "Please enter between 1 and 5 single-digit numbers (e.g. 4-3-3-0-0)."
+            return (
+                False,
+                "Please enter between 1 and 5 single-digit numbers (e.g. 4-3-3-0-0).",
+            )
         try:
             ints = [int(d) for d in digits]
         except ValueError:
@@ -259,7 +279,9 @@ class ControlPanel(QFrame):
             # Don't cycle if button is disabled (no kits loaded)
             if not self.kit_button or not self.kit_button.isEnabled():
                 return
-            self.current_kit_index = (self.current_kit_index + 1) % len(self.kit_options)
+            self.current_kit_index = (self.current_kit_index + 1) % len(
+                self.kit_options
+            )
             new_kit = self.kit_options[self.current_kit_index]
             self.kit_button.setText(new_kit)
             # This is a user action, not a load, so is_loading=False
@@ -270,7 +292,7 @@ class ControlPanel(QFrame):
 
     def on_kit_changed(self, kit_type: str, is_loading: bool = False):
         """Handle kit type changes
-        
+
         Args:
             kit_type: The new kit type (e.g., "Home Kit", "Away Kit", "Third Kit")
             is_loading: If True, this is a load operation and we should NOT save to pool
@@ -278,26 +300,32 @@ class ControlPanel(QFrame):
         try:
             print(f"Kit changed to: {kit_type} (is_loading={is_loading})")
             self.load_jersey_image()
-            
+
             # Only save to pool if this is an actual user change, not a load operation
             if not is_loading:
                 # Find MatchSetupTab to save to pool
                 team_panel = self._find_team_panel_parent()
                 if team_panel:
                     match_setup_tab = team_panel.parent()
-                    while match_setup_tab and not hasattr(match_setup_tab, 'pool_a_kit_index'):
+                    while match_setup_tab and not hasattr(
+                        match_setup_tab, "pool_a_kit_index"
+                    ):
                         match_setup_tab = match_setup_tab.parent()
-                    
+
                     if match_setup_tab:
-                        current_source = getattr(team_panel, 'current_data_source', '')
+                        current_source = getattr(team_panel, "current_data_source", "")
                         # Save kit index to appropriate pool
                         if current_source == "Team A":
                             match_setup_tab.pool_a_kit_index = self.current_kit_index
-                            print(f"Saved kit index {self.current_kit_index} to Team A pool")
+                            print(
+                                f"Saved kit index {self.current_kit_index} to Team A pool"
+                            )
                         elif current_source == "Team B":
                             match_setup_tab.pool_b_kit_index = self.current_kit_index
-                            print(f"Saved kit index {self.current_kit_index} to Team B pool")
-            
+                            print(
+                                f"Saved kit index {self.current_kit_index} to Team B pool"
+                            )
+
             self.kit_changed.emit(kit_type)
             self.data_changed.emit()
         except Exception as e:
@@ -309,7 +337,7 @@ class ControlPanel(QFrame):
         widget = self.parent()
         while widget:
             # Check if this widget has player_table attribute (TeamPanel has it)
-            if hasattr(widget, 'player_table'):
+            if hasattr(widget, "player_table"):
                 return widget
             widget = widget.parent()
         return None
@@ -317,25 +345,33 @@ class ControlPanel(QFrame):
     def on_formation_changed(self, formation: str):
         """Handle formation changes"""
         try:
-            print(f"[ControlPanel] Formation changed to: {formation} in {self.team_name}")
-            
+            print(
+                f"[ControlPanel] Formation changed to: {formation} in {self.team_name}"
+            )
+
             # Allow "Select Formation" to be selected without validation
             if formation == "Select Formation":
                 print(f"[ControlPanel] Allowing 'Select Formation' selection")
                 self.formation_changed.emit(formation)
                 self.data_changed.emit()
                 return
-            
+
             # For actual formations, check if 11 players are selected
             # Traverse up to find TeamPanel (which has player_table)
             team_panel = self._find_team_panel_parent()
             selected_count = 0
-            if team_panel and hasattr(team_panel, 'player_table') and team_panel.player_table:
+            if (
+                team_panel
+                and hasattr(team_panel, "player_table")
+                and team_panel.player_table
+            ):
                 selected_count = team_panel.player_table.get_selected_count()
                 print(f"[ControlPanel] Selected players count: {selected_count}/11")
             else:
-                print(f"[ControlPanel] Warning: Could not access player_table. TeamPanel: {team_panel}, has player_table: {hasattr(team_panel, 'player_table') if team_panel else False}")
-            
+                print(
+                    f"[ControlPanel] Warning: Could not access player_table. TeamPanel: {team_panel}, has player_table: {hasattr(team_panel, 'player_table') if team_panel else False}"
+                )
+
             if selected_count != 11:
                 # Show warning popup
                 msg_text = (
@@ -348,20 +384,28 @@ class ControlPanel(QFrame):
                     self.formation_input.blockSignals(True)
                     previous_formation = "Select Formation"
                     if team_panel:
-                        current_source = getattr(team_panel, 'current_data_source', '')
+                        current_source = getattr(team_panel, "current_data_source", "")
                         if current_source == "Team A":
-                            previous_formation = getattr(team_panel, 'team_a_formation', 'Select Formation')
+                            previous_formation = getattr(
+                                team_panel, "team_a_formation", "Select Formation"
+                            )
                         elif current_source == "Team B":
-                            previous_formation = getattr(team_panel, 'team_b_formation', 'Select Formation')
+                            previous_formation = getattr(
+                                team_panel, "team_b_formation", "Select Formation"
+                            )
                     if previous_formation == "Select Formation":
                         self.formation_input.clear()
                     else:
                         self.formation_input.setText(previous_formation)
                     self.formation_input.blockSignals(False)
-                print(f"[ControlPanel] Formation change blocked - only {selected_count} players selected")
+                print(
+                    f"[ControlPanel] Formation change blocked - only {selected_count} players selected"
+                )
                 return
-            
-            print(f"[ControlPanel] Validation passed, emitting formation_changed signal")
+
+            print(
+                f"[ControlPanel] Validation passed, emitting formation_changed signal"
+            )
             self.formation_changed.emit(formation)
             self.data_changed.emit()
         except Exception as e:
@@ -377,37 +421,49 @@ class ControlPanel(QFrame):
                 team_panel = self._find_team_panel_parent()
                 if team_panel:
                     # Determine current data source
-                    current_source = getattr(team_panel, 'current_data_source', '')
+                    current_source = getattr(team_panel, "current_data_source", "")
                     if current_source == "Team A":
                         team_panel.team_a_color_1 = c1
                     elif current_source == "Team B":
                         team_panel.team_b_color_1 = c1
-                    
+
                     # Update content panel
-                    if hasattr(team_panel, 'content_panel') and team_panel.content_panel:
+                    if (
+                        hasattr(team_panel, "content_panel")
+                        and team_panel.content_panel
+                    ):
                         team_panel.content_panel.update_team_color(c1)
-                    
+
                     # Sync with sibling panel
-                    if hasattr(team_panel, 'parent'):
+                    if hasattr(team_panel, "parent"):
                         match_setup_tab = team_panel.parent()
-                        while match_setup_tab and not hasattr(match_setup_tab, 'home_team_panel'):
+                        while match_setup_tab and not hasattr(
+                            match_setup_tab, "home_team_panel"
+                        ):
                             match_setup_tab = match_setup_tab.parent()
-                        
-                        if match_setup_tab and hasattr(match_setup_tab, 'home_team_panel') and hasattr(match_setup_tab, 'away_team_panel'):
+
+                        if (
+                            match_setup_tab
+                            and hasattr(match_setup_tab, "home_team_panel")
+                            and hasattr(match_setup_tab, "away_team_panel")
+                        ):
                             sibling = None
                             if match_setup_tab.home_team_panel is not team_panel:
                                 sibling = match_setup_tab.home_team_panel
                             elif match_setup_tab.away_team_panel is not team_panel:
                                 sibling = match_setup_tab.away_team_panel
-                            
-                            if sibling and hasattr(sibling, 'content_panel'):
-                                if getattr(sibling, 'current_data_source', '') == current_source:
+
+                            if sibling and hasattr(sibling, "content_panel"):
+                                if (
+                                    getattr(sibling, "current_data_source", "")
+                                    == current_source
+                                ):
                                     if current_source == "Team A":
                                         sibling.team_a_color_1 = c1
                                     else:
                                         sibling.team_b_color_1 = c1
                                     sibling.content_panel.update_team_color(c1)
-            
+
             self.color_changed.emit()
             self.data_changed.emit()
         except Exception as e:
@@ -417,6 +473,7 @@ class ControlPanel(QFrame):
     def load_jersey_image(self):
         """Load and display jersey image based on kit type or stored kit_image from JSON"""
         try:
+
             def resolve_image_path(filename: Optional[str]) -> Optional[Path]:
                 """Resolve kit filename to an existing Path."""
                 if not filename:
@@ -435,17 +492,21 @@ class ControlPanel(QFrame):
                     if candidate.exists():
                         return candidate
                 return None
-            
+
             image_path: Optional[Path] = None
             team_panel = self._find_team_panel_parent()
-            
+
             # Prefer explicit kits array when available
             kits = []
             if team_panel and isinstance(getattr(team_panel, "team_data", None), dict):
                 kits = team_panel.team_data.get("kits", []) or []
-            
+
             if kits and self.kit_button:
-                kit_type_map = {"Home Kit": "home", "Away Kit": "away", "Third Kit": "third"}
+                kit_type_map = {
+                    "Home Kit": "home",
+                    "Away Kit": "away",
+                    "Third Kit": "third",
+                }
                 selected_label = self.kit_button.text() or "Home Kit"
                 selected_type = kit_type_map.get(selected_label, "home")
                 kit = next((k for k in kits if k.get("type") == selected_type), None)
@@ -454,25 +515,44 @@ class ControlPanel(QFrame):
                     kit = next((k for k in kits if k.get("type") == "home"), None)
                 if kit:
                     image_path = resolve_image_path(kit.get("image"))
-            
+
             # Fallback to single kit_image stored on the team (default kit)
             if not image_path or not image_path.exists():
                 if team_panel:
                     kit_image_filename = None
-                    current_source = getattr(team_panel, 'current_data_source', '')
-                    if current_source == "Team A" and getattr(team_panel, "team_a_kit_image", None):
+                    current_source = getattr(team_panel, "current_data_source", "")
+                    if current_source == "Team A" and getattr(
+                        team_panel, "team_a_kit_image", None
+                    ):
                         kit_image_filename = team_panel.team_a_kit_image
-                    elif current_source == "Team B" and getattr(team_panel, "team_b_kit_image", None):
+                    elif current_source == "Team B" and getattr(
+                        team_panel, "team_b_kit_image", None
+                    ):
                         kit_image_filename = team_panel.team_b_kit_image
                     image_path = resolve_image_path(kit_image_filename) or image_path
-            
+
             # Final fallback to known filenames by kit label
             if (not image_path or not image_path.exists()) and self.kit_button:
                 kit_type = self.kit_button.text() if self.kit_button else "Home Kit"
                 kit_images = {
-                    "Home Kit": ["home_kit.png", "Home_kit.png", "homekit.png", "Homekit.png"],
-                    "Away Kit": ["away_kit.png", "Awaykit.png", "awaykit.png", "Away_kit.png"],
-                    "Third Kit": ["third_kit.png", "Third_kit.png", "thirdkit.png", "Thirdkit.png"]
+                    "Home Kit": [
+                        "home_kit.png",
+                        "Home_kit.png",
+                        "homekit.png",
+                        "Homekit.png",
+                    ],
+                    "Away Kit": [
+                        "away_kit.png",
+                        "Awaykit.png",
+                        "awaykit.png",
+                        "Away_kit.png",
+                    ],
+                    "Third Kit": [
+                        "third_kit.png",
+                        "Third_kit.png",
+                        "thirdkit.png",
+                        "Thirdkit.png",
+                    ],
                 }
                 filename_variants = kit_images.get(kit_type, ["home_kit.png"])
                 for filename in filename_variants:
@@ -480,26 +560,28 @@ class ControlPanel(QFrame):
                     if candidate:
                         image_path = candidate
                         break
-            
+
             # Absolute last resort placeholder
             if not image_path or not image_path.exists():
                 image_path = resolve_image_path("jersey.png")
-            
+
             if image_path and image_path.exists():
                 pixmap = QPixmap(str(image_path))
                 if not pixmap.isNull():
                     # Scale the image to fit the label
                     scaled_pixmap = pixmap.scaled(
-                        self.image_label.size(), 
+                        self.image_label.size(),
                         Qt.KeepAspectRatio,
-                        Qt.SmoothTransformation
+                        Qt.SmoothTransformation,
                     )
                     self.image_label.setPixmap(scaled_pixmap)
                     print(f"Loaded kit image: {image_path} for {self.team_name}")
                     try:
                         c1, c2, mode = extract_top_colors(str(image_path))
                         if self.color_panel:
-                            self.color_panel.update_colors(c1, c2 if mode == "double" else c1, mode)
+                            self.color_panel.update_colors(
+                                c1, c2 if mode == "double" else c1, mode
+                            )
                             # Propagate change to field and pools
                             self.on_color_changed()
                     except Exception as _e:
@@ -508,14 +590,16 @@ class ControlPanel(QFrame):
                         bg_hex = extract_bottom_left_color(str(image_path))
                         self.update_bg_color_display(bg_hex)
                     except Exception as _bg_err:
-                        print(f"Background color extraction failed for {image_path}: {_bg_err}")
+                        print(
+                            f"Background color extraction failed for {image_path}: {_bg_err}"
+                        )
                 else:
                     self.image_label.setText("Image\nLoad Error")
                     self.update_bg_color_display("#000000")
             else:
                 self.image_label.setText(f"Kit image\nNot Found")
                 self.update_bg_color_display("#000000")
-                
+
         except Exception as e:
             print(f"Error loading jersey image: {e}")
             traceback.print_exc()
@@ -528,18 +612,18 @@ class ControlPanel(QFrame):
         try:
             show_coords = self.coord_toggle_button.isChecked()
             print(f"Toggling coordinate display: {show_coords} in {self.team_name}")
-            
+
             # Update button text
             if show_coords:
                 self.coord_toggle_button.setText("Hide Coordinates")
             else:
                 self.coord_toggle_button.setText("Show Coordinates")
-            
+
             # Update content panel
             parent = self.parent()
-            if parent and hasattr(parent, 'content_panel'):
+            if parent and hasattr(parent, "content_panel"):
                 parent.content_panel.set_coordinate_display(show_coords)
-            
+
             # Emit data changed signal
             self.data_changed.emit()
         except Exception as e:
@@ -557,13 +641,16 @@ class ControlPanel(QFrame):
                 margin: 5px;
             }
         """
-        
+
         if panel_type == "left":
-            return base_style + """
+            return (
+                base_style
+                + """
                 QFrame {
                     max-width: 780px;
                 }
             """
+            )
         elif panel_type == "right":
             return base_style
         elif panel_type == "control":
@@ -586,7 +673,7 @@ class ControlPanel(QFrame):
                     margin: 2px;
                 }
             """
-    
+
     def get_group_style(self) -> str:
         """Get styling for group frames"""
         return """
@@ -598,7 +685,7 @@ class ControlPanel(QFrame):
                 margin: 1px;
             }
         """
-    
+
     def get_label_style(self) -> str:
         """Get styling for labels"""
         return """
@@ -627,7 +714,7 @@ class ControlPanel(QFrame):
                 border-color: #3b82f6;
             }
         """
-    
+
     def get_combobox_style(self) -> str:
         """Get styling for combo boxes"""
         return """
@@ -663,7 +750,40 @@ class ControlPanel(QFrame):
                 selection-background-color: #3b82f6;
             }
         """
-    
+
+    def get_kit_button_style(self) -> str:
+        """Get styling for kit selector button"""
+        return """
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #1f2937, stop:1 #111827);
+                border: 1px solid #3b82f6;
+                border-radius: 4px;
+                color: #e5e7eb;
+                font-size: 12px;
+                font-weight: 600;
+                padding: 8px 12px;
+                min-height: 32px;
+                text-align: center;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #374151, stop:1 #1f2937);
+                border-color: #3b82f6;
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #111827, stop:1 #0f172a);
+                border-color: #3b82f6;
+            }
+            QPushButton:disabled {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #1f2937, stop:1 #111827);
+                color: #6b7280;
+                border-color: #374151;
+            }
+        """
+
     def get_image_label_style(self) -> str:
         """Get styling for image labels"""
         return """
@@ -676,7 +796,7 @@ class ControlPanel(QFrame):
                 font-weight: 500;
             }
         """
-    
+
     def get_button_style(self) -> str:
         """Get styling for buttons"""
         return """
@@ -759,7 +879,9 @@ class ControlPanel(QFrame):
             return
         self.bg_color_display.setText(color_hex.upper())
         qcolor = QColor(color_hex)
-        brightness = 0.299 * qcolor.red() + 0.587 * qcolor.green() + 0.114 * qcolor.blue()
+        brightness = (
+            0.299 * qcolor.red() + 0.587 * qcolor.green() + 0.114 * qcolor.blue()
+        )
         text_color = "#111827" if brightness > 180 else "#e5e7eb"
         self.bg_color_display.setStyleSheet(f"""
             QLabel {{
