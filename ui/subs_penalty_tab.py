@@ -2710,6 +2710,15 @@ class SubsAndPenaltyTab(QWidget):
                 self.sent_off_home_players if is_home else self.sent_off_away_players
             )
 
+            # DEBUG: Log sent-off players
+            print(
+                f"[DEBUG show_sub_player_list] Team: {team_type}, Type: {player_type}"
+            )
+            print(f"[DEBUG show_sub_player_list] sent_off_set: {sent_off_set}")
+            print(
+                f"[DEBUG show_sub_player_list] sent_off_set type: {type(sent_off_set)}"
+            )
+
             # Get players based on player_type
             if player_type == "out":
                 # Show only playing 11 for "out"
@@ -2861,6 +2870,15 @@ class SubsAndPenaltyTab(QWidget):
                     player.get("jersey_number") or player.get("jersey_no") or ""
                 )
 
+                # DEBUG: Check sent-off status for this player
+                if player_type == "out":
+                    print(
+                        f"[DEBUG show_sub_player_list] Checking player: {name} (#{jersey_num})"
+                    )
+                    print(
+                        f"[DEBUG show_sub_player_list] Is in sent_off_set? {jersey_num in sent_off_set}"
+                    )
+
                 name_item = QTableWidgetItem(name)
                 name_item.setTextAlignment(
                     Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
@@ -2868,35 +2886,34 @@ class SubsAndPenaltyTab(QWidget):
                 number_item = QTableWidgetItem(jersey_num)
                 number_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
+                # PRIORITY ORDER: Check sent-off status FIRST (highest priority)
+                # Then check substitution status
+
+                # Check for sent-off players (works for both "in" and "out" popups)
+                if jersey_num in sent_off_set:
+                    name_item.setForeground(QColor(SENT_OFF_TEXT_COLOR))
+                    number_item.setForeground(QColor(SENT_OFF_TEXT_COLOR))
+                    name_item.setFlags(Qt.ItemFlag.NoItemFlags)
+                    number_item.setFlags(Qt.ItemFlag.NoItemFlags)
+                    if player_type == "out":
+                        tooltip = "Sent off (red card) – player cannot be replaced"
+                    else:
+                        tooltip = "Sent off (red card) – player cannot enter the field"
+                    name_item.setToolTip(tooltip)
+                    number_item.setToolTip(tooltip)
                 # If this is "in" popup and player was substituted out, mark red and disable
-                if player_type == "in" and jersey_num in substituted_out:
+                elif player_type == "in" and jersey_num in substituted_out:
                     # Mark as red and non-selectable
                     name_item.setForeground(QColor("#FF4444"))
                     number_item.setForeground(QColor("#FF4444"))
                     name_item.setFlags(Qt.ItemFlag.NoItemFlags)
                     number_item.setFlags(Qt.ItemFlag.NoItemFlags)
-                # Check for red-carded players in substitutions ("in" popup)
-                elif player_type == "in" and jersey_num in sent_off_set:
-                    name_item.setForeground(QColor(SENT_OFF_TEXT_COLOR))
-                    number_item.setForeground(QColor(SENT_OFF_TEXT_COLOR))
-                    name_item.setFlags(Qt.ItemFlag.NoItemFlags)
-                    number_item.setFlags(Qt.ItemFlag.NoItemFlags)
-                    tooltip = "Sent off (red card) – player cannot enter the field"
-                    name_item.setToolTip(tooltip)
-                    number_item.setToolTip(tooltip)
+                # Highlight players who entered as substitutes (green) - only if not sent off
                 elif player_type == "out" and jersey_num in substituted_in:
                     # Highlight players who entered as substitutes
                     highlight_color = QColor("#22c55e")
                     name_item.setForeground(highlight_color)
                     number_item.setForeground(highlight_color)
-                elif player_type == "out" and jersey_num in sent_off_set:
-                    name_item.setForeground(QColor(SENT_OFF_TEXT_COLOR))
-                    number_item.setForeground(QColor(SENT_OFF_TEXT_COLOR))
-                    name_item.setFlags(Qt.ItemFlag.NoItemFlags)
-                    number_item.setFlags(Qt.ItemFlag.NoItemFlags)
-                    tooltip = "Sent off (red card) – player cannot be replaced"
-                    name_item.setToolTip(tooltip)
-                    number_item.setToolTip(tooltip)
 
                 player_table.setItem(row_idx, 0, name_item)
                 player_table.setItem(row_idx, 1, number_item)
@@ -3478,7 +3495,21 @@ class SubsAndPenaltyTab(QWidget):
         """Enable or disable a row in the table based on Lock checkbox state"""
         try:
             is_locked = state == Qt.CheckState.Checked.value
-            for col in [0, 1, 3]:
+
+            # Time column (0) - should remain editable when unlocked
+            time_item = table.item(row, 0)
+            if time_item:
+                if is_locked:
+                    time_item.setFlags(Qt.ItemFlag.ItemIsSelectable)
+                else:
+                    time_item.setFlags(
+                        Qt.ItemFlag.ItemIsSelectable
+                        | Qt.ItemFlag.ItemIsEnabled
+                        | Qt.ItemFlag.ItemIsEditable
+                    )
+
+            # Other non-editable columns (1, 3)
+            for col in [1, 3]:
                 item = table.item(row, col)
                 if item:
                     if is_locked:
