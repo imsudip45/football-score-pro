@@ -92,9 +92,9 @@ class ControlPanel(QFrame):
 
         # Kit selector label
         kit_label = QLabel("Select Kit")
-        kit_label.setAlignment(Qt.AlignCenter)
-        kit_label.setFrameShape(QFrame.NoFrame)
-        kit_label.setFrameShadow(QFrame.Plain)
+        kit_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        kit_label.setFrameShape(QFrame.Shape.NoFrame)
+        kit_label.setFrameShadow(QFrame.Shadow.Plain)
         kit_label.setLineWidth(0)
         kit_label.setMidLineWidth(0)
         kit_label.setStyleSheet(
@@ -123,7 +123,7 @@ class ControlPanel(QFrame):
 
         # Image display area
         self.image_label = QLabel()
-        self.image_label.setAlignment(Qt.AlignCenter)
+        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setFixedSize(140, 140)
         self.image_label.setStyleSheet(self.get_image_label_style())
         layout.addWidget(self.image_label)
@@ -160,12 +160,12 @@ class ControlPanel(QFrame):
         bg_layout.setSpacing(6)
 
         bg_label = QLabel("Brand Color")
-        bg_label.setAlignment(Qt.AlignCenter)
+        bg_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         bg_label.setStyleSheet(self.get_label_style())
         bg_layout.addWidget(bg_label)
 
         self.bg_color_display = QLabel(self.bg_color_hex.upper())
-        self.bg_color_display.setAlignment(Qt.AlignCenter)
+        self.bg_color_display.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.bg_color_display.setFixedHeight(36)
         self.bg_color_display.setStyleSheet("""
             QLabel {
@@ -184,7 +184,7 @@ class ControlPanel(QFrame):
         # App logo in its own area (no frame) under the coordinates group
         try:
             self.app_logo_label = QLabel()
-            self.app_logo_label.setAlignment(Qt.AlignCenter)
+            self.app_logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.app_logo_label.setStyleSheet(
                 "QLabel { background: transparent; border: none; }"
             )
@@ -195,7 +195,9 @@ class ControlPanel(QFrame):
                 pix = QPixmap(str(logo_path))
                 if not pix.isNull():
                     target_h = max(24, 115)
-                    scaled = pix.scaledToHeight(target_h, Qt.SmoothTransformation)
+                    scaled = pix.scaledToHeight(
+                        target_h, Qt.TransformationMode.SmoothTransformation
+                    )
                     self.app_logo_label.setPixmap(scaled)
                     logo_opacity = QGraphicsOpacityEffect(self.app_logo_label)
                     logo_opacity.setOpacity(
@@ -310,18 +312,26 @@ class ControlPanel(QFrame):
                     while match_setup_tab and not hasattr(
                         match_setup_tab, "pool_a_kit_index"
                     ):
-                        match_setup_tab = match_setup_tab.parent()
+                        match_setup_tab = match_setup_tab.parent()  # type: ignore[union-attr]
 
                     if match_setup_tab:
                         current_source = getattr(team_panel, "current_data_source", "")
                         # Save kit index to appropriate pool
                         if current_source == "Team A":
-                            match_setup_tab.pool_a_kit_index = self.current_kit_index
+                            setattr(
+                                match_setup_tab,
+                                "pool_a_kit_index",
+                                self.current_kit_index,
+                            )
                             print(
                                 f"Saved kit index {self.current_kit_index} to Team A pool"
                             )
                         elif current_source == "Team B":
-                            match_setup_tab.pool_b_kit_index = self.current_kit_index
+                            setattr(
+                                match_setup_tab,
+                                "pool_b_kit_index",
+                                self.current_kit_index,
+                            )
                             print(
                                 f"Saved kit index {self.current_kit_index} to Team B pool"
                             )
@@ -346,12 +356,12 @@ class ControlPanel(QFrame):
         """Handle formation changes"""
         try:
             print(
-                f"[ControlPanel] Formation changed to: {formation} in {self.team_name}"
+                f"[ControlPanel] Formation changed to: {formation} in {self.team_name}"  # noqa: F541
             )
 
             # Allow "Select Formation" to be selected without validation
             if formation == "Select Formation":
-                print(f"[ControlPanel] Allowing 'Select Formation' selection")
+                print("[ControlPanel] Allowing 'Select Formation' selection")
                 self.formation_changed.emit(formation)
                 self.data_changed.emit()
                 return
@@ -360,12 +370,11 @@ class ControlPanel(QFrame):
             # Traverse up to find TeamPanel (which has player_table)
             team_panel = self._find_team_panel_parent()
             selected_count = 0
-            if (
-                team_panel
-                and hasattr(team_panel, "player_table")
-                and team_panel.player_table
-            ):
-                selected_count = team_panel.player_table.get_selected_count()
+            player_table = (
+                getattr(team_panel, "player_table", None) if team_panel else None
+            )
+            if player_table is not None:
+                selected_count = player_table.get_selected_count()
                 print(f"[ControlPanel] Selected players count: {selected_count}/11")
             else:
                 print(
@@ -403,9 +412,7 @@ class ControlPanel(QFrame):
                 )
                 return
 
-            print(
-                f"[ControlPanel] Validation passed, emitting formation_changed signal"
-            )
+            print("[ControlPanel] Validation passed, emitting formation_changed signal")
             self.formation_changed.emit(formation)
             self.data_changed.emit()
         except Exception as e:
@@ -423,16 +430,14 @@ class ControlPanel(QFrame):
                     # Determine current data source
                     current_source = getattr(team_panel, "current_data_source", "")
                     if current_source == "Team A":
-                        team_panel.team_a_color_1 = c1
+                        setattr(team_panel, "team_a_color_1", c1)
                     elif current_source == "Team B":
-                        team_panel.team_b_color_1 = c1
+                        setattr(team_panel, "team_b_color_1", c1)
 
                     # Update content panel
-                    if (
-                        hasattr(team_panel, "content_panel")
-                        and team_panel.content_panel
-                    ):
-                        team_panel.content_panel.update_team_color(c1)
+                    content_panel = getattr(team_panel, "content_panel", None)
+                    if content_panel is not None:
+                        content_panel.update_team_color(c1)
 
                     # Sync with sibling panel
                     if hasattr(team_panel, "parent"):
@@ -440,29 +445,40 @@ class ControlPanel(QFrame):
                         while match_setup_tab and not hasattr(
                             match_setup_tab, "home_team_panel"
                         ):
-                            match_setup_tab = match_setup_tab.parent()
+                            match_setup_tab = match_setup_tab.parent()  # type: ignore[union-attr]
 
-                        if (
-                            match_setup_tab
-                            and hasattr(match_setup_tab, "home_team_panel")
-                            and hasattr(match_setup_tab, "away_team_panel")
-                        ):
+                        home_team_panel = (
+                            getattr(match_setup_tab, "home_team_panel", None)
+                            if match_setup_tab
+                            else None
+                        )
+                        away_team_panel = (
+                            getattr(match_setup_tab, "away_team_panel", None)
+                            if match_setup_tab
+                            else None
+                        )
+                        if home_team_panel is not None and away_team_panel is not None:
                             sibling = None
-                            if match_setup_tab.home_team_panel is not team_panel:
-                                sibling = match_setup_tab.home_team_panel
-                            elif match_setup_tab.away_team_panel is not team_panel:
-                                sibling = match_setup_tab.away_team_panel
+                            if home_team_panel is not team_panel:
+                                sibling = home_team_panel
+                            elif away_team_panel is not team_panel:
+                                sibling = away_team_panel
 
-                            if sibling and hasattr(sibling, "content_panel"):
+                            sibling_content_panel = (
+                                getattr(sibling, "content_panel", None)
+                                if sibling
+                                else None
+                            )
+                            if sibling_content_panel is not None:
                                 if (
                                     getattr(sibling, "current_data_source", "")
                                     == current_source
                                 ):
                                     if current_source == "Team A":
-                                        sibling.team_a_color_1 = c1
+                                        setattr(sibling, "team_a_color_1", c1)
                                     else:
-                                        sibling.team_b_color_1 = c1
-                                    sibling.content_panel.update_team_color(c1)
+                                        setattr(sibling, "team_b_color_1", c1)
+                                    sibling_content_panel.update_team_color(c1)
 
             self.color_changed.emit()
             self.data_changed.emit()
@@ -498,8 +514,9 @@ class ControlPanel(QFrame):
 
             # Prefer explicit kits array when available
             kits = []
-            if team_panel and isinstance(getattr(team_panel, "team_data", None), dict):
-                kits = team_panel.team_data.get("kits", []) or []
+            team_data = getattr(team_panel, "team_data", None) if team_panel else None
+            if team_panel and isinstance(team_data, dict):
+                kits = team_data.get("kits", []) or []
 
             if kits and self.kit_button:
                 kit_type_map = {
@@ -521,14 +538,12 @@ class ControlPanel(QFrame):
                 if team_panel:
                     kit_image_filename = None
                     current_source = getattr(team_panel, "current_data_source", "")
-                    if current_source == "Team A" and getattr(
-                        team_panel, "team_a_kit_image", None
-                    ):
-                        kit_image_filename = team_panel.team_a_kit_image
-                    elif current_source == "Team B" and getattr(
-                        team_panel, "team_b_kit_image", None
-                    ):
-                        kit_image_filename = team_panel.team_b_kit_image
+                    team_a_kit_image = getattr(team_panel, "team_a_kit_image", None)
+                    team_b_kit_image = getattr(team_panel, "team_b_kit_image", None)
+                    if current_source == "Team A" and team_a_kit_image:
+                        kit_image_filename = team_a_kit_image
+                    elif current_source == "Team B" and team_b_kit_image:
+                        kit_image_filename = team_b_kit_image
                     image_path = resolve_image_path(kit_image_filename) or image_path
 
             # Final fallback to known filenames by kit label
@@ -565,14 +580,14 @@ class ControlPanel(QFrame):
             if not image_path or not image_path.exists():
                 image_path = resolve_image_path("jersey.png")
 
-            if image_path and image_path.exists():
+            if image_path and image_path.exists() and self.image_label is not None:
                 pixmap = QPixmap(str(image_path))
                 if not pixmap.isNull():
                     # Scale the image to fit the label
                     scaled_pixmap = pixmap.scaled(
                         self.image_label.size(),
-                        Qt.KeepAspectRatio,
-                        Qt.SmoothTransformation,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
                     )
                     self.image_label.setPixmap(scaled_pixmap)
                     print(f"Loaded kit image: {image_path} for {self.team_name}")
@@ -580,7 +595,9 @@ class ControlPanel(QFrame):
                         c1, c2, mode = extract_top_colors(str(image_path))
                         if self.color_panel:
                             self.color_panel.update_colors(
-                                c1, c2 if mode == "double" else c1, mode
+                                c1,
+                                c2 if c2 is not None and mode == "double" else c1,
+                                mode,
                             )
                             # Propagate change to field and pools
                             self.on_color_changed()
@@ -594,10 +611,12 @@ class ControlPanel(QFrame):
                             f"Background color extraction failed for {image_path}: {_bg_err}"
                         )
                 else:
-                    self.image_label.setText("Image\nLoad Error")
+                    if self.image_label is not None:
+                        self.image_label.setText("Image\nLoad Error")
                     self.update_bg_color_display("#000000")
             else:
-                self.image_label.setText(f"Kit image\nNot Found")
+                if self.image_label is not None:
+                    self.image_label.setText("Kit image\nNot Found")
                 self.update_bg_color_display("#000000")
 
         except Exception as e:
@@ -610,6 +629,8 @@ class ControlPanel(QFrame):
     def toggle_coordinate_display(self):
         """Toggle coordinate display for player markers"""
         try:
+            if self.coord_toggle_button is None:
+                return
             show_coords = self.coord_toggle_button.isChecked()
             print(f"Toggling coordinate display: {show_coords} in {self.team_name}")
 
@@ -621,8 +642,9 @@ class ControlPanel(QFrame):
 
             # Update content panel
             parent = self.parent()
-            if parent and hasattr(parent, "content_panel"):
-                parent.content_panel.set_coordinate_display(show_coords)
+            content_panel = getattr(parent, "content_panel", None) if parent else None
+            if content_panel is not None:
+                content_panel.set_coordinate_display(show_coords)
 
             # Emit data changed signal
             self.data_changed.emit()

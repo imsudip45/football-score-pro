@@ -2,33 +2,38 @@
 Guest Form Dialog for entering guest data
 """
 
-from typing import Dict, Any, Optional
-from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, 
-    QLineEdit, QPushButton, QTextEdit, QComboBox, QDateEdit,
-    QGroupBox, QSpacerItem, QSizePolicy
-)
-from PySide6.QtCore import Qt, Signal, QDate
+from typing import Any, Dict, Optional
+
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (
+    QDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+)
 
 
 class GuestFormDialog(QDialog):
     """Dialog for entering guest information"""
-    
+
     guest_saved = Signal(dict)  # Emitted when guest data is saved
-    
+
     def __init__(self, guest_data: Optional[Dict[str, Any]] = None, parent=None):
         super().__init__(parent)
         self.guest_data = guest_data or {}
         self.setup_ui()
         self.populate_form()
-        
+
     def setup_ui(self):
         """Setup the dialog UI"""
         self.setWindowTitle("Guest Information")
         self.setModal(True)
         self.setFixedSize(400, 300)
-        
+
         # Set dialog style
         self.setStyleSheet("""
             QDialog {
@@ -70,12 +75,12 @@ class GuestFormDialog(QDialog):
                 background: transparent;
             }
         """)
-        
+
         # Main layout
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
-        
+
         # Title
         title_label = QLabel("Guest Information Form")
         title_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
@@ -92,28 +97,30 @@ class GuestFormDialog(QDialog):
         """)
         title_label.setFixedHeight(40)
         layout.addWidget(title_label)
-        
+
         # Simple form layout
         form_layout = QFormLayout()
         form_layout.setSpacing(15)
-        
+
         # Full Name field
         self.full_name_edit = QLineEdit()
         self.full_name_edit.setPlaceholderText("Enter full name")
         self.full_name_edit.setMinimumHeight(40)
         form_layout.addRow("Full Name:", self.full_name_edit)
-        
+
         # Guest Type field
         self.guest_type_edit = QLineEdit()
-        self.guest_type_edit.setPlaceholderText("Enter guest type (e.g., VIP Guest, Chief Guest)")
+        self.guest_type_edit.setPlaceholderText(
+            "Enter guest type (e.g., VIP Guest, Chief Guest)"
+        )
         self.guest_type_edit.setMinimumHeight(40)
         form_layout.addRow("Guest Type:", self.guest_type_edit)
-        
+
         layout.addLayout(form_layout)
-        
+
         # Buttons
         button_layout = QHBoxLayout()
-        
+
         self.save_button = QPushButton("Save Guest")
         self.save_button.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         self.save_button.setStyleSheet("""
@@ -136,7 +143,7 @@ class GuestFormDialog(QDialog):
             }
         """)
         self.save_button.clicked.connect(self.save_guest)
-        
+
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         self.cancel_button.setStyleSheet("""
@@ -155,46 +162,47 @@ class GuestFormDialog(QDialog):
             }
         """)
         self.cancel_button.clicked.connect(self.reject)
-        
+
         button_layout.addStretch()
         button_layout.addWidget(self.cancel_button)
         button_layout.addWidget(self.save_button)
-        
+
         layout.addLayout(button_layout)
-        
+
     def populate_form(self):
         """Populate form with existing guest data if available"""
         if not self.guest_data:
             return
-            
+
         self.full_name_edit.setText(self.guest_data.get("full_name", ""))
-        
+
         # Set guest type
         guest_type = self.guest_data.get("guest_type", "VIP Guest")
         self.guest_type_edit.setText(guest_type)
-        
+
     def save_guest(self):
         """Save guest data and emit signal"""
         # Validate required fields
         if not self.full_name_edit.text().strip():
             self.show_validation_error("Full name is required")
             return
-        
+
         # Collect form data
         guest_data = {
             "full_name": self.full_name_edit.text().strip(),
-            "guest_type": self.guest_type_edit.text().strip() or "Guest"
+            "guest_type": self.guest_type_edit.text().strip() or "Guest",
         }
-        
+
         print(f"Guest form saving data: {guest_data}")
-        
+
         # Emit signal with guest data
         self.guest_saved.emit(guest_data)
         self.accept()
-        
+
     def show_validation_error(self, message: str):
         """Show validation error message"""
         from PySide6.QtWidgets import QMessageBox
+
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle("Validation Error")
         msg_box.setText(message)

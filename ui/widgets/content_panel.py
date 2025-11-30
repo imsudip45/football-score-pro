@@ -525,7 +525,7 @@ class ContentPanel(QWidget):
             marker.update()
         self.scene.update()
 
-    def toggle_coordinate_display(self, show: bool = None):
+    def toggle_coordinate_display(self, show: Optional[bool] = None):
         """Toggle coordinate display for all player markers"""
         if show is None:
             # Toggle current state
@@ -626,7 +626,9 @@ class ContentPanel(QWidget):
     # (Removed duplicate update_selected_players implementation)
 
     def apply_formation_to_players(
-        self, formation: str, marker_d_override: float = None
+        self,
+        formation: str,
+        marker_d_override: Optional[float] = None,
     ):
         """Mirror old app: center-relative lanes + closest-assignment; set marker centers"""
         try:

@@ -2,12 +2,22 @@
 Multi Guest Form Dialog - single dialog to edit all guest entries at once
 """
 
-from typing import Dict, Any
-from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QLineEdit, QPushButton, QWidget, QSizePolicy, QScrollArea
-)
+from typing import Any, Dict
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (
+    QDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class MultiGuestFormDialog(QDialog):
@@ -103,34 +113,34 @@ class MultiGuestFormDialog(QDialog):
             form = QFormLayout(row)
             form.setContentsMargins(0, 0, 0, 0)
             form.setSpacing(6)
-            try:
-                form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
-            except Exception:
-                form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+            form.setFieldGrowthPolicy(
+                QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+            )
 
             name_edit = QLineEdit()
             name_edit.setPlaceholderText(f"Guest {i} full name")
             name_edit.setMinimumWidth(380)
             name_edit.setMinimumHeight(44)
-            try:
-                name_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            except AttributeError:
-                name_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            name_edit.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+            )
 
             designation_edit = QLineEdit()
             designation_edit.setPlaceholderText("Designation (e.g., VIP Guest)")
             designation_edit.setMinimumWidth(380)
             designation_edit.setMinimumHeight(44)
-            try:
-                designation_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            except AttributeError:
-                designation_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            designation_edit.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+            )
 
             form.addRow(QLabel(f"Guest {i} Name:"), name_edit)
             form.addRow(QLabel("Designation:"), designation_edit)
 
             content_layout.addWidget(row)
-            self._edits[guest_id] = {"full_name": name_edit, "designation": designation_edit}
+            self._edits[guest_id] = {
+                "full_name": name_edit,
+                "designation": designation_edit,
+            }
 
         content.setLayout(content_layout)
         scroll.setWidget(content)
@@ -153,7 +163,9 @@ class MultiGuestFormDialog(QDialog):
         for guest_id, fields in self._edits.items():
             data = self.existing_guests.get(guest_id, {}) or {}
             fields["full_name"].setText(str(data.get("full_name", "")))
-            fields["designation"].setText(str(data.get("designation", data.get("guest_type", ""))))
+            fields["designation"].setText(
+                str(data.get("designation", data.get("guest_type", "")))
+            )
 
     def _on_save(self):
         payload: Dict[str, Any] = {}
@@ -164,5 +176,3 @@ class MultiGuestFormDialog(QDialog):
                 payload[guest_id] = {"full_name": name, "designation": gtype or "Guest"}
         self.guests_saved.emit(payload)
         self.accept()
-
-

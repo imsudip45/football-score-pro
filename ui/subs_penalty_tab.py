@@ -11,37 +11,29 @@ from PySide6.QtCore import (
     QEvent,
     QPropertyAnimation,
     Qt,
-    QTime,
-    QTimer,
     Signal,
 )
-from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QCheckBox,
-    QComboBox,
     QFrame,
     QGraphicsBlurEffect,
-    QGraphicsOpacityEffect,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QMessageBox,
     QPushButton,
     QScrollArea,
-    QSizePolicy,
-    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
-    QTabWidget,
-    QTextEdit,
-    QTimeEdit,
     QVBoxLayout,
     QWidget,
 )
+
+from .backend_service import BackendService
 
 # Local color palette matching Play On (no external imports)
 COLORS = {
@@ -88,9 +80,6 @@ TIME_EDITOR_STYLE = """
         background-color: #1f2937;
     }
 """
-
-from .backend_service import BackendService
-from .widgets.modern_components import ModernButton, ModernLabel
 
 
 class AnimatedToggle(QCheckBox):
@@ -1002,57 +991,6 @@ class SubsAndPenaltyTab(QWidget):
 
     def reset_scorer_row(self, table: QTableWidget, row: int):
         try:
-            t_item = table.item(row, 0)
-            if t_item:
-                t_item.setText("00:00")
-                t_item.setTextAlignment(Qt.AlignCenter)
-                t_item.setFlags(
-                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
-                )
-                t_item.setFont(QFont("Verdana", 12))
-                t_item.setStyleSheet("QFont { color: #ffffff; }")
-            n_item = table.item(row, 1)
-            if n_item:
-                n_item.setText("")
-                n_item.setTextAlignment(Qt.AlignCenter)
-                n_item.setFlags(
-                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
-                )
-                n_item.setStyleSheet("QFont { color: #ffffff; }")
-            name_btn = table.cellWidget(row, 2)
-            if name_btn:
-                name_btn.setText("Select Player")
-            # Disable lock
-            for c in [4]:
-                w = table.cellWidget(row, c)
-                if w:
-                    cb = w.findChild(QCheckBox)
-                    if cb:
-                        cb.setChecked(False)
-                        cb.setEnabled(False)
-        except Exception:
-            pass
-
-    def toggle_scorer_row_lock(self, table: QTableWidget, row: int, state: int):
-        try:
-            is_locked = state == Qt.CheckState.Checked.value
-            for col in [0, 1]:
-                item = table.item(row, col)
-                if item:
-                    item.setFlags(
-                        Qt.ItemFlag.ItemIsSelectable
-                        if is_locked
-                        else (Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
-                    )
-            for col in [2, 3, 5]:
-                w = table.cellWidget(row, col)
-                if w:
-                    w.setEnabled(not is_locked)
-        except Exception:
-            pass
-
-    def reset_scorer_row(self, table: QTableWidget, row: int):
-        try:
             # Preserve time - don't reset it
             # Reset other data
             n_item = table.item(row, 1)
@@ -1807,10 +1745,10 @@ class SubsAndPenaltyTab(QWidget):
             )
             for cb, col in [(goal, 2), (missed, 3), (export, 4), (lock, 5)]:
                 w = QWidgetContainer()
-                l = QHBoxLayout(w)
-                l.addWidget(cb)
-                l.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                l.setContentsMargins(0, 0, 0, 0)
+                layout = QHBoxLayout(w)
+                layout.addWidget(cb)
+                layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                layout.setContentsMargins(0, 0, 0, 0)
                 table.setCellWidget(r, col, w)
             lock.setEnabled(False)
 
@@ -1936,10 +1874,10 @@ class SubsAndPenaltyTab(QWidget):
             )
             for cb, col in [(goal, 2), (missed, 3), (export, 4), (lock, 5)]:
                 w = QWidget()
-                l = QHBoxLayout(w)
-                l.addWidget(cb)
-                l.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                l.setContentsMargins(0, 0, 0, 0)
+                layout = QHBoxLayout(w)
+                layout.addWidget(cb)
+                layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                layout.setContentsMargins(0, 0, 0, 0)
                 table.setCellWidget(row, col, w)
             lock.setEnabled(False)
             goal.stateChanged.connect(
@@ -2180,7 +2118,9 @@ class SubsAndPenaltyTab(QWidget):
                     is_home = False
 
                     print(
-                        f"DEBUG delete_row_of_button: Found row {row}, checking if substitution table"
+                        "DEBUG delete_row_of_button: Found row",
+                        row,
+                        ", checking if substitution table",
                     )
                     print(
                         f"DEBUG delete_row_of_button: table.columnCount()={table.columnCount()}"
@@ -2189,7 +2129,7 @@ class SubsAndPenaltyTab(QWidget):
                     # Check if this is a substitution table (8 columns with specific headers)
                     if table.columnCount() == 8:
                         print(
-                            f"DEBUG delete_row_of_button: Table has 8 columns, checking table reference"
+                            "DEBUG delete_row_of_button: Table has 8 columns, checking table reference"
                         )
                         # Check if it's the home or away substitution table
                         if (
@@ -2199,7 +2139,7 @@ class SubsAndPenaltyTab(QWidget):
                             is_substitution_table = True
                             is_home = True
                             print(
-                                f"DEBUG delete_row_of_button: Identified as HOME substitution table"
+                                "DEBUG delete_row_of_button: Identified as HOME substitution table"
                             )
                         elif (
                             hasattr(self, "away_sub_table")
@@ -2208,11 +2148,11 @@ class SubsAndPenaltyTab(QWidget):
                             is_substitution_table = True
                             is_home = False
                             print(
-                                f"DEBUG delete_row_of_button: Identified as AWAY substitution table"
+                                "DEBUG delete_row_of_button: Identified as AWAY substitution table"
                             )
                         else:
                             print(
-                                f"DEBUG delete_row_of_button: 8 columns but not a known substitution table"
+                                "DEBUG delete_row_of_button: 8 columns but not a known substitution table"
                             )
 
                     if table.columnCount() == 7:
@@ -2270,7 +2210,7 @@ class SubsAndPenaltyTab(QWidget):
                                 return
                         else:
                             print(
-                                f"DEBUG delete_row_of_button: No in_jersey_no, just deleting empty substitution row"
+                                "DEBUG delete_row_of_button: No in_jersey_no, just deleting empty substitution row"
                             )
                             table.removeRow(row)
                         return
@@ -2284,7 +2224,7 @@ class SubsAndPenaltyTab(QWidget):
                             return
                     else:
                         print(
-                            f"DEBUG delete_row_of_button: Not a substitution table, just deleting row"
+                            "DEBUG delete_row_of_button: Not a substitution table, just deleting row"
                         )
 
                     # Delete the row (for non-substitution tables)
@@ -3067,7 +3007,7 @@ class SubsAndPenaltyTab(QWidget):
         """
         try:
             if not jersey_no:
-                print(f"DEBUG is_player_in_scorer_or_cards: empty jersey_no")
+                print("DEBUG is_player_in_scorer_or_cards: empty jersey_no")
                 return False
 
             print(
@@ -3082,12 +3022,12 @@ class SubsAndPenaltyTab(QWidget):
             if main_window and hasattr(main_window, "play_on_tab"):
                 play_on_tab = main_window.play_on_tab
                 print(
-                    f"DEBUG is_player_in_scorer_or_cards: Found Play On tab through window()"
+                    "DEBUG is_player_in_scorer_or_cards: Found Play On tab through window()"
                 )
 
             if not play_on_tab:
                 print(
-                    f"DEBUG is_player_in_scorer_or_cards: Could not access Play On tab"
+                    "DEBUG is_player_in_scorer_or_cards: Could not access Play On tab"
                 )
                 return False
 

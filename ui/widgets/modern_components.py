@@ -5,9 +5,17 @@ Custom styled components with professional appearance
 
 from typing import Optional
 
-from PySide6.QtWidgets import QPushButton, QLabel, QWidget, QCheckBox, QVBoxLayout, QHBoxLayout, QLineEdit, QSizePolicy
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPainter, QColor, QLinearGradient, QPen, QBrush, QFont
+from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class ModernButton(QPushButton):
@@ -18,7 +26,7 @@ class ModernButton(QPushButton):
         self.style_type = style_type
         self._custom_stylesheet: Optional[str] = None
         self.setMinimumHeight(35)
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.apply_style()
 
     def apply_style(self):
@@ -242,14 +250,14 @@ class ModernCheckbox(QWidget):
         super().__init__(parent)
         self.checked = False
         self.setFixedSize(20, 20)  # Reduced size to ensure it fits in column
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         # Make background transparent so container color shows through
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
         if self.checked:
             gradient = QLinearGradient(0, 0, 0, self.height())
             gradient.setColorAt(0, QColor("#10b981"))
@@ -259,16 +267,18 @@ class ModernCheckbox(QWidget):
         else:
             painter.setBrush(QColor("#1f2937"))
             painter.setPen(QPen(QColor("#4b5563"), 2))
-        
-        painter.drawRoundedRect(1, 1, self.width()-2, self.height()-2, 3, 3)
-        
+
+        painter.drawRoundedRect(1, 1, self.width() - 2, self.height() - 2, 3, 3)
+
         if self.checked:
-            painter.setPen(QPen(QColor('white'), 2, Qt.SolidLine, Qt.RoundCap))
+            painter.setPen(
+                QPen(QColor("white"), 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+            )
             painter.drawLine(4, 10, 7, 13)
             painter.drawLine(7, 13, 15, 5)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.toggle()
 
     def toggle(self) -> bool:
@@ -298,7 +308,9 @@ class ModernSpinBox(QWidget):
 
     valueChanged = Signal(int)
 
-    def __init__(self, parent=None, minimum: int = 0, maximum: int = 9999, value: int = 0):
+    def __init__(
+        self, parent=None, minimum: int = 0, maximum: int = 9999, value: int = 0
+    ):
         super().__init__(parent)
         self._min = minimum
         self._max = maximum
@@ -307,7 +319,7 @@ class ModernSpinBox(QWidget):
         try:
             self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         except AttributeError:
-            self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.setFixedHeight(44)
         self.setFixedWidth(140)
 
@@ -346,29 +358,29 @@ class ModernSpinBox(QWidget):
         arrows.setContentsMargins(0, 0, 0, 0)
         arrows.setSpacing(0)
 
-        self.btn_up = ModernButton("\u25B2", "secondary", self)
+        self.btn_up = ModernButton("\u25b2", "secondary", self)
         self.btn_up.setFixedSize(28, 22)
         self.btn_up.setStyleSheet(
             """
-            QPushButton { 
-                border-top-right-radius: 12px; 
-                border-bottom-right-radius: 0px; 
-                padding: 0; 
-                min-height: 0; 
+            QPushButton {
+                border-top-right-radius: 12px;
+                border-bottom-right-radius: 0px;
+                padding: 0;
+                min-height: 0;
                 font-size: 16px;
                 font-weight: bold;
             }
             """
         )
-        self.btn_down = ModernButton("\u25BC", "secondary", self)
+        self.btn_down = ModernButton("\u25bc", "secondary", self)
         self.btn_down.setFixedSize(28, 22)
         self.btn_down.setStyleSheet(
             """
-            QPushButton { 
-                border-top-right-radius: 0px; 
-                border-bottom-right-radius: 12px; 
-                padding: 0; 
-                min-height: 0; 
+            QPushButton {
+                border-top-right-radius: 0px;
+                border-bottom-right-radius: 12px;
+                padding: 0;
+                min-height: 0;
                 font-size: 16px;
                 font-weight: bold;
             }

@@ -1,14 +1,10 @@
 import copy
-import os
-import sys
-from math import sqrt
 
-from PySide6.QtCore import Property, QObject, QPropertyAnimation, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QIcon, QLinearGradient, QPainter, QPen, QPixmap
+from PySide6.QtCore import Property, QObject, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
-    QComboBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -17,7 +13,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QRadioButton,
-    QScrollArea,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -1766,10 +1761,9 @@ class PlayOnTab(QWidget):
         # Tournament label (positioned above timer)
         self.tournament_label = QLabel("Tournament Name", self)
         self.tournament_label.setFont(QFont("Verdana", 10, QFont.Weight.Normal))
-        self.tournament_label.setStyleSheet(f"""
+        self.tournament_label.setStyleSheet("""
             QLabel {{
-
-                background: transparent;
+                background-color: transparent;
                 border: none;
             }}
         """)
@@ -2444,20 +2438,20 @@ class PlayOnTab(QWidget):
                         self.home_team_image.setScaledContents(
                             False
                         )  # Let scaling handle it
-                        print(f"DEBUG: Successfully loaded home team logo")
+                        print("DEBUG: Successfully loaded home team logo")
                     else:
-                        print(f"DEBUG: Failed to load home team logo pixmap")
+                        print("DEBUG: Failed to load home team logo pixmap")
                         self.home_team_image.clear()
                         self.home_team_image.setText("NO LOGO\nFOUND")
                 else:
-                    print(f"DEBUG: Home team logo file not found")
+                    print("DEBUG: Home team logo file not found")
                     self.home_team_image.clear()
                     self.home_team_image.setText("NO LOGO\nFOUND")
             else:
                 if hasattr(self, "home_team_image"):
                     self.home_team_image.clear()
                     self.home_team_image.setText("NO LOGO\nFOUND")
-                print(f"DEBUG: No home team logo path found")
+                print("DEBUG: No home team logo path found")
 
             # Load away team logo
             if away_logo_path and hasattr(self, "away_team_image"):
@@ -2478,20 +2472,20 @@ class PlayOnTab(QWidget):
                         self.away_team_image.setScaledContents(
                             False
                         )  # Let scaling handle it
-                        print(f"DEBUG: Successfully loaded away team logo")
+                        print("DEBUG: Successfully loaded away team logo")
                     else:
-                        print(f"DEBUG: Failed to load away team logo pixmap")
+                        print("DEBUG: Failed to load away team logo pixmap")
                         self.away_team_image.clear()
                         self.away_team_image.setText("NO LOGO\nFOUND")
                 else:
-                    print(f"DEBUG: Away team logo file not found")
+                    print("DEBUG: Away team logo file not found")
                     self.away_team_image.clear()
                     self.away_team_image.setText("NO LOGO\nFOUND")
             else:
                 if hasattr(self, "away_team_image"):
                     self.away_team_image.clear()
                     self.away_team_image.setText("NO LOGO\nFOUND")
-                print(f"DEBUG: No away team logo path found")
+                print("DEBUG: No away team logo path found")
 
         except Exception as e:
             print(f"Error loading team logos: {e}")
@@ -4468,137 +4462,8 @@ class PlayOnTab(QWidget):
             except Exception as e:
                 print(f"Error updating card totals after reset: {e}")
 
-        except Exception as e:
+        except Exception:
             print("Error resetting card row")
-
-    # Reset button moved to toolbar in main window
-
-    def reset_match(self):
-        """Reset the match state to initial match-created state."""
-        try:
-            # Reset basic match state
-            self.seconds = 0
-            self.home_goals = 0
-            self.away_goals = 0
-            self.home_goal_label.setText("0")
-            self.away_goal_label.setText("0")
-
-            self.update_timer_display()
-            self.stop_timer()
-            self.min_value.setValue(0)
-            self.second_value.setValue(0)
-            self.extra_time_enabled = False
-            self.extra_time_minutes = 0
-
-            # Reset possession tracking
-            self.home_ball_control_time = 0
-            self.away_ball_control_time = 0
-            self.current_possession = None
-            self._suppress_possession_highlight_once = True
-            try:
-                self.update_team_panel_borders()
-            except Exception:
-                pass
-
-            # Reset possession button text back to "Kickoff" and reapply styling
-            if hasattr(self, "possession_toggle_btn"):
-                self.possession_toggle_btn.setText("Kickoff")
-                self._apply_possession_button_style("neutral")
-
-            # Reset statistics data
-            for key in self.stats_data:
-                self.stats_data[key] = 0
-
-            # Reset cards tables
-            if hasattr(self, "home_card_table"):
-                for row in range(self.home_card_table.rowCount()):
-                    self.reset_card_row(self.home_card_table, row)
-                    if row > 0:  # Hide all rows except first
-                        self.home_card_table.hideRow(row)
-
-            if hasattr(self, "away_card_table"):
-                for row in range(self.away_card_table.rowCount()):
-                    self.reset_card_row(self.away_card_table, row)
-                    if row > 0:  # Hide all rows except first
-                        self.away_card_table.hideRow(row)
-
-            # Reset scorer panels and their tables
-            if hasattr(self, "home_scorer_panel"):
-                print("DEBUG reset_match: clearing home scorer")
-                self.home_scorer_panel.previous_goal_count = 0
-                # Hide all rows initially (match-created state)
-                for r in range(self.home_scorer_panel.scorer_table.rowCount()):
-                    try:
-                        self.home_scorer_panel.scorer_table.hideRow(r)
-                    except Exception:
-                        pass
-                # Reset all scorer table rows
-                for row in range(self.home_scorer_panel.scorer_table.rowCount()):
-                    self.home_scorer_panel.reset_scorer_row(row)
-
-            if hasattr(self, "away_scorer_panel"):
-                print("DEBUG reset_match: clearing away scorer")
-                self.away_scorer_panel.previous_goal_count = 0
-                # Hide all rows initially (match-created state)
-                for r in range(self.away_scorer_panel.scorer_table.rowCount()):
-                    try:
-                        self.away_scorer_panel.scorer_table.hideRow(r)
-                    except Exception:
-                        pass
-                # Reset all scorer table rows
-                for row in range(self.away_scorer_panel.scorer_table.rowCount()):
-                    self.away_scorer_panel.reset_scorer_row(row)
-
-            # Reset stats widgets and update display
-            if hasattr(self, "stats_widgets"):
-                for stat_key, widgets in self.stats_widgets.items():
-                    if stat_key == "possession_time":
-                        widgets["home_value"].setText("00:00")
-                        widgets["away_value"].setText("00:00")
-                    elif stat_key == "possession":
-                        widgets["home_value"].setText("50")
-                        widgets["away_value"].setText("50")
-                    else:
-                        widgets["home_value"].setText("0")
-                        widgets["away_value"].setText("0")
-
-            # Reset extra time components
-            if hasattr(self, "extra_time_spin"):
-                self.extra_time_spin.setValue(0)
-            if hasattr(self, "extra_time_check"):
-                self.extra_time_check.setChecked(False)
-            if hasattr(self, "extra_time_value_label"):
-                self.extra_time_value_label.setText("+0")
-                self.extra_time_value_label.setVisible(False)
-
-            # Reset radio button to current time
-            if hasattr(self, "radio_current_time"):
-                self.radio_current_time.setChecked(True)
-
-            # Reset header styles to default
-            if hasattr(self, "stats_home_header_label"):
-                self.stats_home_header_label.setStyleSheet(
-                    self.stats_header_default_style
-                )
-            if hasattr(self, "stats_away_header_label"):
-                self.stats_away_header_label.setStyleSheet(
-                    self.stats_header_default_style
-                )
-
-            # Ensure scorer visibility matches goals (0) strictly
-            self._ensure_scorer_panel_initialized("home")
-            self._ensure_scorer_panel_initialized("away")
-            self._debug_dump_scorer_rows("home")
-            self._debug_dump_scorer_rows("away")
-            print("DEBUG reset_match: end")
-
-            # Update all stats displays to reflect the reset values
-            self.update_all_stats_displays()
-
-            print("Match reset completed successfully")
-
-        except Exception as e:
-            print(f"Error in reset_match: {str(e)}")
 
     def update_all_stats_displays(self):
         """Update all stats displays to show current values."""
@@ -4891,7 +4756,7 @@ class PlayOnTab(QWidget):
         self.stats_deploy_button.setFont(QFont("Verdana", 14, QFont.Weight.Bold))
         # Nudge deploy button away from rounded border
         self.stats_deploy_button.setGeometry(470, 15, 90, 30)
-        self.stats_deploy_button.setStyleSheet(f"""
+        self.stats_deploy_button.setStyleSheet("""
             QPushButton {{
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 #38a169, stop:1 #2f855a);
@@ -4944,11 +4809,9 @@ class PlayOnTab(QWidget):
         """
 
         # Compute dynamic width for the Stats column to occupy all middle space
-        # Layout: |<-20->|[Home 140]|<-gap 20->|[Stats ?]|<-gap 20->|[Away 140]|<-20->|
-        left_margin = 20
+        # Layout: |<-20->|[Home 140]|<-gap 20->|[Stats ?]|<-gap 20->|[Away 140]|<-20->
         right_margin = 20
         header_width = 140
-        gap_between_columns = 20
         panel_width = stats_panel.geometry().width()
         # X for stats column begins after left header and gap
         # Adjust this value to shift the entire stats column left (negative) or right (positive)
@@ -5304,196 +5167,6 @@ class PlayOnTab(QWidget):
             self.extra_time_value_label.setText("+0")
             self.extra_time_value_label.setVisible(False)
 
-    def increase_stat(self, stat_key, team):
-        """Increase a statistic for the specified team."""
-        key = f"{team}_{stat_key}"
-        if key in self.stats_data:
-            try:
-                print(
-                    f"DEBUG increase_stat: team={team}, stat={stat_key}, before={self.stats_data[key]}"
-                )
-            except Exception:
-                pass
-            self.stats_data[key] += 1
-            self.update_stat_display(stat_key, team)
-            try:
-                print(f"Increased {team} {stat_key} to {self.stats_data[key]}")
-            except Exception:
-                pass
-            # Keep Shots in sync when Shots on Target changes
-            if stat_key == "shots_on_target":
-                shots_key = f"{team}_shots"
-                if shots_key in self.stats_data:
-                    self.stats_data[shots_key] += 1
-                    self.update_stat_display("shots", team)
-            # Ensure Shots on Target increases with Goals
-            if stat_key == "goals":
-                self.increase_stat("shots_on_target", team)
-            # Enforce invariants (SOT >= Goals, Shots >= SOT)
-            self._enforce_stats_invariants(team)
-            if stat_key == "goals":
-                # Also update the main goal display
-                if team == "home":
-                    self.home_goals = self.stats_data[key]
-                    self.home_goal_label.setText(str(self.home_goals))
-                    current_time = self.timer_label.text()
-                    if hasattr(self, "home_scorer_panel"):
-                        self.home_scorer_panel.update_goals(
-                            self.home_goals, current_time
-                        )
-                else:
-                    self.away_goals = self.stats_data[key]
-                    self.away_goal_label.setText(str(self.away_goals))
-                    current_time = self.timer_label.text()
-                    if hasattr(self, "away_scorer_panel"):
-                        self.away_scorer_panel.update_goals(
-                            self.away_goals, current_time
-                        )
-
-    def decrease_stat(self, stat_key, team):
-        """Decrease a statistic for the specified team."""
-        key = f"{team}_{stat_key}"
-        if key in self.stats_data and self.stats_data[key] > 0:
-            try:
-                print(
-                    f"DEBUG decrease_stat(entry): team={team}, stat={stat_key}, current={self.stats_data[key]}"
-                )
-            except Exception:
-                pass
-            try:
-                print(
-                    f"DEBUG decrease_stat: team={team}, stat={stat_key}, before={self.stats_data[key]}"
-                )
-            except Exception:
-                pass
-            # Prevent Shots on Target from going below Goals
-            if stat_key == "shots_on_target":
-                # Use stats_data goals, but also fall back to the visible goal label to avoid desync
-                goals_key = f"{team}_goals"
-                goals_val_data = self.stats_data.get(goals_key, 0)
-                try:
-                    label_val = (
-                        int(self.home_goal_label.text())
-                        if team == "home"
-                        else int(self.away_goal_label.text())
-                    )
-                except Exception:
-                    label_val = 0
-                goals_val = max(goals_val_data, label_val)
-                try:
-                    print(
-                        f"DEBUG decrease_stat: team={team}, stat=shots_on_target, current={self.stats_data[key]}, goals={goals_val}"
-                    )
-                except Exception:
-                    pass
-                if self.stats_data[key] - 1 < goals_val:
-                    # Do not allow decrement below goals
-                    try:
-                        print(
-                            "DEBUG decrease_stat: block decrement SOT because it would go below goals"
-                        )
-                    except Exception:
-                        pass
-                    return
-            # Prevent Shots from going below Shots on Target
-            if stat_key == "shots":
-                sot_val = self.stats_data.get(f"{team}_shots_on_target", 0)
-                try:
-                    print(
-                        f"DEBUG decrease_stat: team={team}, stat=shots, current={self.stats_data[key]}, sot={sot_val}"
-                    )
-                except Exception:
-                    pass
-                if self.stats_data[key] - 1 < sot_val:
-                    try:
-                        print(
-                            "DEBUG decrease_stat: block decrement Shots because it would go below SOT"
-                        )
-                    except Exception:
-                        pass
-                    return
-            self.stats_data[key] -= 1
-            self.update_stat_display(stat_key, team)
-            try:
-                print(f"Decreased {team} {stat_key} to {self.stats_data[key]}")
-            except Exception:
-                pass
-            # Keep Shots in sync when Shots on Target changes
-            if stat_key == "shots_on_target":
-                shots_key = f"{team}_shots"
-                if shots_key in self.stats_data and self.stats_data[shots_key] > 0:
-                    self.stats_data[shots_key] -= 1
-                    self.update_stat_display("shots", team)
-                # Post-decrement safety: ensure SOT not below Goals
-                try:
-                    goals_key = f"{team}_goals"
-                    goals_val_data = self.stats_data.get(goals_key, 0)
-                    label_val = (
-                        int(self.home_goal_label.text())
-                        if team == "home"
-                        else int(self.away_goal_label.text())
-                    )
-                except Exception:
-                    label_val = 0
-                goals_val = max(goals_val_data, label_val)
-                if self.stats_data[key] < goals_val:
-                    try:
-                        print(
-                            f"DEBUG post-fix SOT: bumping {team} SOT {self.stats_data[key]} -> {goals_val} (goals)"
-                        )
-                    except Exception:
-                        pass
-                    self.stats_data[key] = goals_val
-                    self.update_stat_display(stat_key, team)
-            # Enforce invariants (SOT >= Goals, Shots >= SOT)
-            self._enforce_stats_invariants(team)
-            if stat_key == "goals":
-                # Also update the main goal display
-                if team == "home":
-                    self.home_goals = self.stats_data[key]
-                    self.home_goal_label.setText(str(self.home_goals))
-                    current_time = self.timer_label.text()
-                    if hasattr(self, "home_scorer_panel"):
-                        self.home_scorer_panel.update_goals(
-                            self.home_goals, current_time
-                        )
-                else:
-                    self.away_goals = self.stats_data[key]
-                    self.away_goal_label.setText(str(self.away_goals))
-                    current_time = self.timer_label.text()
-                    if hasattr(self, "away_scorer_panel"):
-                        self.away_scorer_panel.update_goals(
-                            self.away_goals, current_time
-                        )
-                # After decreasing goals, reduce shots on target by 1 only if above new goals
-                sot_key = f"{team}_shots_on_target"
-                if self.stats_data.get(sot_key, 0) > self.stats_data[key]:
-                    self.decrease_stat("shots_on_target", team)
-
-    def safe_decrease_stat(self, stat_key, team):
-        """Wrapper around decrease_stat with an extra pre-check for SOT>=Goals."""
-        if stat_key == "shots_on_target":
-            try:
-                goals_key = f"{team}_goals"
-                goals_val_data = self.stats_data.get(goals_key, 0)
-                label_val = (
-                    int(self.home_goal_label.text())
-                    if team == "home"
-                    else int(self.away_goal_label.text())
-                )
-            except Exception:
-                label_val = 0
-            min_allowed = max(goals_val_data, label_val)
-            current = self.stats_data.get(f"{team}_shots_on_target", 0)
-            if current - 1 < min_allowed:
-                try:
-                    print(
-                        f"DEBUG safe_decrease_stat: blocked {team} SOT decrement {current}-> {current - 1} < goals {min_allowed}"
-                    )
-                except Exception:
-                    pass
-                return
-        self.decrease_stat(stat_key, team)
 
     def update_stat_display(self, stat_key, team):
         """Update the display of a statistic."""
@@ -5626,7 +5299,7 @@ class PlayOnTab(QWidget):
 
         # Visual feedback for deployment
         original_style = self.stats_deploy_button.styleSheet()
-        self.stats_deploy_button.setStyleSheet(f"""
+        self.stats_deploy_button.setStyleSheet("""
             QPushButton {{
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 #2563eb, stop:1 #1d4ed8);

@@ -5,31 +5,38 @@ Based on the old Game Settings UI but integrated with new backend architecture
 """
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
-
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel, QPushButton, 
-    QMessageBox, QProgressDialog, QLineEdit
-)
-from PySide6.QtCore import Signal, Qt, QTimer
-from PySide6.QtGui import QFont
-
-from .backend_service import BackendService
-from .backend_sync import sync_match_snapshot
-from .widgets.team_panel import TeamPanel
-from .widgets.officials_tab import OfficialsTab
 
 # Import Team model for backend compatibility
 import sys
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QProgressDialog,
+    QPushButton,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
+
+from .backend_service import BackendService
+from .backend_sync import sync_match_snapshot
+from .widgets.officials_tab import OfficialsTab
+from .widgets.team_panel import TeamPanel
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from src.models.team import Team
 from src.constants import TeamConstants
 
 
 class MatchSetupTab(QWidget):
     """Main Match Setup Tab that orchestrates all components"""
-    
+
     # Signal for match data changes
     match_data_changed = Signal(dict)
     match_created = Signal(str)  # match_id
@@ -43,7 +50,7 @@ class MatchSetupTab(QWidget):
         # Global per-team colors (shared across panels)
         self.pool_a_color_1 = "#000000"
         self.pool_b_color_1 = "#000000"
-        
+
         # Global state management (like old Game_Setting.py)
         self.a_selected_rows = set()  # Global selected rows for Team A
         self.b_selected_rows = set()  # Global selected rows for Team B
@@ -55,76 +62,69 @@ class MatchSetupTab(QWidget):
         self.pool_a_allow_fixture_defaults = True
         self.pool_b_allow_fixture_defaults = True
         self.current_match_id = None
-        
+
         # Initialize components
         self.home_team_panel = TeamPanel("Home Team", self.backend_service, self)
         self.away_team_panel = TeamPanel("Away Team", self.backend_service, self)
         self.officials_tab = OfficialsTab(self.backend_service, self)
-        
+
         self.setup_ui()
         self.connect_signals()
-        
+
     def setup_ui(self):
         """Setup the main UI layout"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
-        
+
         # Create tabs widget first
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet(self.get_tab_style())
-        
+
         # Hide the default tab bar since we're using custom buttons
         self.tabs.tabBar().setVisible(False)
-        
+
         # Add team tabs
         self.tabs.addTab(self.home_team_panel, "Home Team")
         self.tabs.addTab(self.away_team_panel, "Away Team")
         self.tabs.addTab(self.officials_tab, "Officials")
-        
+
         # Create custom header with tab buttons, match number, and create match button
         header_layout = self.create_header_layout()
         layout.addLayout(header_layout)
-        
+
         # Add the tabs content area (without the tab buttons)
         layout.addWidget(self.tabs)
-    
-    def on_data_changed(self):
-        """Handle data changes from any component"""
-        try:
-            # Emit match data changed signal
-            match_data = self.get_match_data()
-            self.match_data_changed.emit(match_data)
-        except Exception as e:
-            pass
-        
+
     def create_header_layout(self):
         """Create header layout with custom tab buttons, match number, and create match button"""
         header_layout = QHBoxLayout()
-        
+
         # Create custom tab buttons
         self.home_tab_button = QPushButton("Home Team")
         self.away_tab_button = QPushButton("Away Team")
         self.officials_tab_button = QPushButton("Officials")
-        
+
         # Style the tab buttons
         self.home_tab_button.setStyleSheet(self.get_tab_button_style(True))  # Active
         self.away_tab_button.setStyleSheet(self.get_tab_button_style(False))  # Inactive
-        self.officials_tab_button.setStyleSheet(self.get_tab_button_style(False))  # Inactive
-        
+        self.officials_tab_button.setStyleSheet(
+            self.get_tab_button_style(False)
+        )  # Inactive
+
         # Connect tab button signals
         self.home_tab_button.clicked.connect(lambda: self.switch_tab(0))
         self.away_tab_button.clicked.connect(lambda: self.switch_tab(1))
         self.officials_tab_button.clicked.connect(lambda: self.switch_tab(2))
-        
+
         # Add tab buttons to layout
         header_layout.addWidget(self.home_tab_button)
         header_layout.addWidget(self.away_tab_button)
         header_layout.addWidget(self.officials_tab_button)
-        
+
         # Add spacer
         header_layout.addStretch()
-        
+
         # Match number controls with separate arrows
         match_label = QLabel("MATCH NO:")
         match_label.setStyleSheet("""
@@ -135,7 +135,7 @@ class MatchSetupTab(QWidget):
                 padding: 5px;
             }
         """)
-        
+
         # Match number input field
         self.match_input = QLineEdit("1")
         self.match_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -153,9 +153,9 @@ class MatchSetupTab(QWidget):
                 border: 2px solid #3b82f6;
             }
         """)
-        
+
         # Up arrow button
-        self.match_up_button = QPushButton("\u25B2")
+        self.match_up_button = QPushButton("\u25b2")
         self.match_up_button.setFixedSize(32, 24)
         self.match_up_button.setFont(QFont("Verdana", 16, QFont.Weight.Bold))
         self.match_up_button.setStyleSheet("""
@@ -174,9 +174,9 @@ class MatchSetupTab(QWidget):
                 border: 1px solid #6b7280;
                 }
         """)
-        
+
         # Down arrow button
-        self.match_down_button = QPushButton("\u25BC")
+        self.match_down_button = QPushButton("\u25bc")
         self.match_down_button.setFixedSize(32, 24)
         self.match_down_button.setFont(QFont("Verdana", 16, QFont.Weight.Bold))
         self.match_down_button.setStyleSheet("""
@@ -195,101 +195,105 @@ class MatchSetupTab(QWidget):
                 border: 1px solid #6b7280;
                 }
         """)
-        
+
         # Connect button signals
         self.match_up_button.clicked.connect(self.increment_match_number)
         self.match_down_button.clicked.connect(self.decrement_match_number)
         self.match_input.editingFinished.connect(self.on_match_number_changed)
-        
+
         # Create vertical layout for arrow buttons
         arrow_layout = QVBoxLayout()
         arrow_layout.setContentsMargins(0, 0, 0, 0)
         arrow_layout.setSpacing(0)
         arrow_layout.addWidget(self.match_up_button)
         arrow_layout.addWidget(self.match_down_button)
-        
+
         # Create container widget for arrow buttons
         arrow_container = QWidget()
         arrow_container.setLayout(arrow_layout)
-        arrow_container.setFixedSize(32, 48)  # Width matches button width, height for both buttons
-        
+        arrow_container.setFixedSize(
+            32, 48
+        )  # Width matches button width, height for both buttons
+
         # Add widgets to layout with minimal spacing
         header_layout.addWidget(match_label)
         header_layout.addWidget(self.match_input)
-        
+
         # Add arrow container with minimal gap
         header_layout.addSpacing(2)  # Very small gap
         header_layout.addWidget(arrow_container)
-        
+
         # Create Match button
         self.create_match_button = QPushButton("CREATE MATCH")
         self.create_match_button.setStyleSheet(self.get_create_button_style())
         self.create_match_button.clicked.connect(self.create_match)
-        
+
         header_layout.addWidget(self.create_match_button)
-        
+
         return header_layout
-    
+
     def switch_tab(self, index: int):
         """Switch to the specified tab"""
         self.tabs.setCurrentIndex(index)
-        
+
         # Update button styles
         self.home_tab_button.setStyleSheet(self.get_tab_button_style(index == 0))
         self.away_tab_button.setStyleSheet(self.get_tab_button_style(index == 1))
         self.officials_tab_button.setStyleSheet(self.get_tab_button_style(index == 2))
-        
+
     def connect_signals(self):
         """Connect all signals"""
         # Connect team panel signals
         self.home_team_panel.data_changed.connect(self.on_data_changed)
         self.away_team_panel.data_changed.connect(self.on_data_changed)
-        
+
         # Connect formation panel data source changes (like old Game_Setting.py)
-        self.home_team_panel.formation_panel.data_changed.connect(self.on_home_team_data_source_changed)
-        self.away_team_panel.formation_panel.data_changed.connect(self.on_away_team_data_source_changed)
-            
+        self.home_team_panel.formation_panel.data_changed.connect(
+            self.on_home_team_data_source_changed
+        )
+        self.away_team_panel.formation_panel.data_changed.connect(
+            self.on_away_team_data_source_changed
+        )
+
         # Connect officials tab signals
         self.officials_tab.data_changed.connect(self.on_data_changed)
-        
+
         # Match number input already calls on_data_changed via helper methods
-    
+
     def on_data_changed(self):
         """Handle data changes from any component"""
         self.match_data_changed.emit(self.get_match_data())
-    
+
     def get_match_data(self) -> dict:
         """Get complete match data from all components"""
         try:
             # Get team data
             home_team_data = self.home_team_panel.get_team_data()
             away_team_data = self.away_team_panel.get_team_data()
-            
+
             # Get officials data
             officials_data = self.officials_tab.get_officials_data()
-            
+
             # Combine all data
             match_data = {
-                'match_id': self.current_match_id,
-                'match_number': self.get_match_number(),
-                'home_team': home_team_data,
-                'away_team': away_team_data,
-                'officials': officials_data,
-                'created_at': None,  # Will be set when match is created
-                'status': 'setup'  # Match is in setup phase
+                "match_id": self.current_match_id,
+                "match_number": self.get_match_number(),
+                "home_team": home_team_data,
+                "away_team": away_team_data,
+                "officials": officials_data,
+                "created_at": None,  # Will be set when match is created
+                "status": "setup",  # Match is in setup phase
             }
-            
+
             return match_data
-            
-        except Exception as e:
+
+        except Exception:
             return {}
 
     def export_state(self) -> dict:
         """Return a serializable snapshot of the current match setup state."""
         try:
-            state = {
-                "match_data": self.get_match_data()
-            }
+            state = {"match_data": self.get_match_data()}
             if hasattr(self, "home_team_panel"):
                 state["home_panel_state"] = self.home_team_panel.export_state()
             if hasattr(self, "away_team_panel"):
@@ -299,8 +303,12 @@ class MatchSetupTab(QWidget):
                 "pool_b_color_1": getattr(self, "pool_b_color_1", "#000000"),
                 "pool_a_kit_index": getattr(self, "pool_a_kit_index", 0),
                 "pool_b_kit_index": getattr(self, "pool_b_kit_index", 0),
-                "pool_a_formation": getattr(self, "pool_a_formation", "Select Formation"),
-                "pool_b_formation": getattr(self, "pool_b_formation", "Select Formation"),
+                "pool_a_formation": getattr(
+                    self, "pool_a_formation", "Select Formation"
+                ),
+                "pool_b_formation": getattr(
+                    self, "pool_b_formation", "Select Formation"
+                ),
             }
             return state
         except Exception as exc:
@@ -314,15 +322,25 @@ class MatchSetupTab(QWidget):
                 return
             match_data = state.get("match_data") if isinstance(state, dict) else state
             if isinstance(match_data, dict):
-                self.current_match_id = match_data.get("match_id", self.current_match_id)
+                self.current_match_id = match_data.get(
+                    "match_id", self.current_match_id
+                )
                 self.load_match_data(match_data)
             pool_state = state.get("pool_state", {})
             self.pool_a_color_1 = pool_state.get("pool_a_color_1", self.pool_a_color_1)
             self.pool_b_color_1 = pool_state.get("pool_b_color_1", self.pool_b_color_1)
-            self.pool_a_kit_index = pool_state.get("pool_a_kit_index", self.pool_a_kit_index)
-            self.pool_b_kit_index = pool_state.get("pool_b_kit_index", self.pool_b_kit_index)
-            self.pool_a_formation = pool_state.get("pool_a_formation", self.pool_a_formation)
-            self.pool_b_formation = pool_state.get("pool_b_formation", self.pool_b_formation)
+            self.pool_a_kit_index = pool_state.get(
+                "pool_a_kit_index", self.pool_a_kit_index
+            )
+            self.pool_b_kit_index = pool_state.get(
+                "pool_b_kit_index", self.pool_b_kit_index
+            )
+            self.pool_a_formation = pool_state.get(
+                "pool_a_formation", self.pool_a_formation
+            )
+            self.pool_b_formation = pool_state.get(
+                "pool_b_formation", self.pool_b_formation
+            )
             if "home_panel_state" in state and hasattr(self, "home_team_panel"):
                 self.home_team_panel.load_state(state["home_panel_state"])
             if "away_panel_state" in state and hasattr(self, "away_team_panel"):
@@ -331,74 +349,86 @@ class MatchSetupTab(QWidget):
                 self.match_data_changed.emit(match_data)
         except Exception as exc:
             print(f"Error loading match state: {exc}")
-            
+
     def load_fixture_data(self, fixture_data: dict):
         """Load fixture data and update both team panels"""
         try:
             # Mark that we are in initial fixture load so colors can be initialized from fixture
             self._is_initial_fixture_load = True
-            
+
             # Extract team data from fixture - handle different formats
             home_team_data = None
             away_team_data = None
-            
+
             # Check if it's the new format with teams array
-            if 'teams' in fixture_data and isinstance(fixture_data['teams'], list):
-                teams = fixture_data['teams']
+            if "teams" in fixture_data and isinstance(fixture_data["teams"], list):
+                teams = fixture_data["teams"]
                 for team in teams:
-                    if team.get('id') == 'A':
+                    if team.get("id") == "A":
                         home_team_data = team
-                    elif team.get('id') == 'B':
+                    elif team.get("id") == "B":
                         away_team_data = team
             # Check if it's the old format with home_team/away_team keys
-            elif 'home_team' in fixture_data and 'away_team' in fixture_data:
+            elif "home_team" in fixture_data and "away_team" in fixture_data:
                 home_team_data = fixture_data.get("home_team", {})
                 away_team_data = fixture_data.get("away_team", {})
-            
+
             # Store team data for global access
             if home_team_data:
                 self.home_team_data = self._format_team_data(home_team_data)
                 self.pool_a_allow_fixture_defaults = True
                 # Initialize global pool color for Team A from fixture
-                self.pool_a_color_1 = self.home_team_data.get('color_1', self.pool_a_color_1)
-            
+                self.pool_a_color_1 = self.home_team_data.get(
+                    "color_1", self.pool_a_color_1
+                )
+
             if away_team_data:
                 self.away_team_data = self._format_team_data(away_team_data)
                 self.pool_b_allow_fixture_defaults = True
                 # Initialize global pool color for Team B from fixture
-                self.pool_b_color_1 = self.away_team_data.get('color_1', self.pool_b_color_1)
-            
+                self.pool_b_color_1 = self.away_team_data.get(
+                    "color_1", self.pool_b_color_1
+                )
+
             # Preload panels with both teams so radio labels/formation reflect immediately
 
-            if hasattr(self, 'home_team_panel'):
-                if hasattr(self, 'home_team_data'):
+            if hasattr(self, "home_team_panel"):
+                if hasattr(self, "home_team_data"):
                     self.home_team_panel.team_a_data = self.home_team_data.copy()
                     self.home_team_panel.team_a_formation = "Select Formation"
-                if hasattr(self, 'away_team_data'):
+                if hasattr(self, "away_team_data"):
                     self.home_team_panel.team_b_data = self.away_team_data.copy()
                     self.home_team_panel.team_b_formation = "Select Formation"
-            
-            if hasattr(self, 'away_team_panel'):
-                if hasattr(self, 'home_team_data'):
+
+            if hasattr(self, "away_team_panel"):
+                if hasattr(self, "home_team_data"):
                     self.away_team_panel.team_a_data = self.home_team_data.copy()
                     self.away_team_panel.team_a_formation = "Select Formation"
-                if hasattr(self, 'away_team_data'):
+                if hasattr(self, "away_team_data"):
                     self.away_team_panel.team_b_data = self.away_team_data.copy()
                     self.away_team_panel.team_b_formation = "Select Formation"
-            
+
             # Update radio button labels with team names for both panels (if both teams available)
-            if hasattr(self, 'home_team_data') and hasattr(self, 'away_team_data'):
-                self.home_team_panel.update_radio_short_names(self.home_team_data, self.away_team_data)
-                self.away_team_panel.update_radio_short_names(self.home_team_data, self.away_team_data)
+            if hasattr(self, "home_team_data") and hasattr(self, "away_team_data"):
+                self.home_team_panel.update_radio_short_names(
+                    self.home_team_data, self.away_team_data
+                )
+                self.away_team_panel.update_radio_short_names(
+                    self.home_team_data, self.away_team_data
+                )
                 self.home_team_panel.refresh_formation_labels()
                 self.away_team_panel.refresh_formation_labels()
 
             # Load initial team data (Home shows Team A, Away shows Team B)
-            if hasattr(self, 'home_team_data'):
-                self.update_player_table(self.home_team_panel, self.home_team_data, "home", "a")
-            if hasattr(self, 'away_team_data'):
-                self.update_player_table(self.away_team_panel, self.away_team_data, "away", "b")
-            
+            if hasattr(self, "home_team_data"):
+                self.update_player_table(
+                    self.home_team_panel, self.home_team_data, "home", "a"
+                )
+            if hasattr(self, "away_team_data"):
+                self.update_player_table(
+                    self.away_team_panel, self.away_team_data, "away", "b"
+                )
+
             # Load tournament data if available
             tournament_data = fixture_data.get("tournament", {})
             if tournament_data:
@@ -406,52 +436,79 @@ class MatchSetupTab(QWidget):
 
             # Load officials pool from fixture if available (for selector dialog)
             # Check for _parent_data first (from multi-fixture tournament files)
-            parent_data = fixture_data.get('_parent_data', {})
+            parent_data = fixture_data.get("_parent_data", {})
             if parent_data:
                 # Extract from parent_data (root level of multi-fixture JSON)
                 officials_pool_data = {
-                    'available_officials': parent_data.get('available_officials'),
-                    'available_commentators': parent_data.get('available_commentators'),
-                    'available_hosts': parent_data.get('available_hosts')
+                    "available_officials": parent_data.get("available_officials"),
+                    "available_commentators": parent_data.get("available_commentators"),
+                    "available_hosts": parent_data.get("available_hosts"),
                 }
             else:
                 # Try extracting from fixture_data directly (single fixture or legacy format)
-                officials_pool_data = self.backend_service.extract_officials_pool_from_fixture(fixture_data)
-            
+                officials_pool_data = (
+                    self.backend_service.extract_officials_pool_from_fixture(
+                        fixture_data
+                    )
+                )
+
             if officials_pool_data:
                 # Build pool data structure for load_officials_pool
                 pool_to_load = {}
-                
+
                 # Extract available_officials (contains referees, assistant_referees, etc.)
-                if 'available_officials' in officials_pool_data and officials_pool_data['available_officials']:
-                    available_officials = officials_pool_data['available_officials']
+                if (
+                    "available_officials" in officials_pool_data
+                    and officials_pool_data["available_officials"]
+                ):
+                    available_officials = officials_pool_data["available_officials"]
                     if isinstance(available_officials, dict):
-                        normalized_pool = self._normalize_available_officials_pool(available_officials)
+                        normalized_pool = self._normalize_available_officials_pool(
+                            available_officials
+                        )
                         pool_to_load.update(normalized_pool)
                         self.officials_tab.load_officials_data(available_officials)
-                
+
                 # Add commentators if available
-                if 'available_commentators' in officials_pool_data and officials_pool_data['available_commentators']:
-                    pool_to_load['commentators'] = officials_pool_data['available_commentators']
-                
+                if (
+                    "available_commentators" in officials_pool_data
+                    and officials_pool_data["available_commentators"]
+                ):
+                    pool_to_load["commentators"] = officials_pool_data[
+                        "available_commentators"
+                    ]
+
                 # Add hosts if available
-                if 'available_hosts' in officials_pool_data and officials_pool_data['available_hosts']:
-                    pool_to_load['hosts'] = officials_pool_data['available_hosts']
-                
+                if (
+                    "available_hosts" in officials_pool_data
+                    and officials_pool_data["available_hosts"]
+                ):
+                    pool_to_load["hosts"] = officials_pool_data["available_hosts"]
+
                 if pool_to_load:
                     # Load the officials pool into the backend service
-                    tournament_id = tournament_data.get('id') if tournament_data else None
-                    print(f"MatchSetupTab: Loading officials pool with {len(pool_to_load)} categories")
-                    result = self.backend_service.load_officials_pool(pool_to_load, tournament_id)
+                    tournament_id = (
+                        tournament_data.get("id") if tournament_data else None
+                    )
+                    print(
+                        "MatchSetupTab: Loading officials pool with",
+                        len(pool_to_load),
+                        "categories",
+                    )
+                    result = self.backend_service.load_officials_pool(
+                        pool_to_load, tournament_id
+                    )
                     if result.success:
-                        print(f"MatchSetupTab: Officials pool loaded successfully")
+                        print("MatchSetupTab: Officials pool loaded successfully")
                     else:
-                        print(f"MatchSetupTab: Failed to load officials pool: {result.errors}")
+                        print(
+                            f"MatchSetupTab: Failed to load officials pool: {result.errors}"
+                        )
                 else:
-                    print(f"MatchSetupTab: No officials pool data to load")
+                    print("MatchSetupTab: No officials pool data to load")
             else:
-                print(f"MatchSetupTab: No officials pool data found in fixture")
-            
+                print("MatchSetupTab: No officials pool data found in fixture")
+
             # DON'T automatically load officials data into the UI - let user manually select
             # The officials pool is still loaded above for the selector dialog to work
             # officials_data = fixture_data.get("officials", {})
@@ -464,86 +521,102 @@ class MatchSetupTab(QWidget):
             #         self.officials_tab.set_officials(normalized_officials)
             # Initial fixture load complete
             self._is_initial_fixture_load = False
-            
+
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to load fixture: {str(e)}")
-    
-    def _normalize_available_officials_pool(self, available_officials: Dict[str, Any]) -> Dict[str, Any]:
+
+    def _normalize_available_officials_pool(
+        self, available_officials: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Convert panel-based officials arrays into backend pool categories."""
         normalized: Dict[str, Any] = {}
         if not isinstance(available_officials, dict):
             return normalized
-        
+
         officials_panel = available_officials.get("officials_panel")
         if officials_panel:
-            normalized['referees'] = officials_panel
-            normalized.setdefault('linesmen', officials_panel)
-            normalized.setdefault('fourth_officials', officials_panel)
-            normalized.setdefault('var_referees', officials_panel)
+            normalized["referees"] = officials_panel
+            normalized.setdefault("linesmen", officials_panel)
+            normalized.setdefault("fourth_officials", officials_panel)
+            normalized.setdefault("var_referees", officials_panel)
         else:
-            for legacy_key in ('referees', 'linesmen', 'fourth_officials', 'var_referees'):
+            for legacy_key in (
+                "referees",
+                "linesmen",
+                "fourth_officials",
+                "var_referees",
+            ):
                 if legacy_key in available_officials:
                     normalized[legacy_key] = available_officials[legacy_key]
-        
-        if 'commentators_panel' in available_officials:
-            normalized['commentators'] = available_officials['commentators_panel']
-        elif 'commentators' in available_officials:
-            normalized['commentators'] = available_officials['commentators']
-        
-        if 'hosts_panel' in available_officials:
-            normalized['hosts'] = available_officials['hosts_panel']
-        elif 'hosts' in available_officials:
-            normalized['hosts'] = available_officials['hosts']
-        
-        if 'available_commentators' in available_officials and 'commentators' not in normalized:
-            normalized['commentators'] = available_officials['available_commentators']
-        if 'available_hosts' in available_officials and 'hosts' not in normalized:
-            normalized['hosts'] = available_officials['available_hosts']
-        
+
+        if "commentators_panel" in available_officials:
+            normalized["commentators"] = available_officials["commentators_panel"]
+        elif "commentators" in available_officials:
+            normalized["commentators"] = available_officials["commentators"]
+
+        if "hosts_panel" in available_officials:
+            normalized["hosts"] = available_officials["hosts_panel"]
+        elif "hosts" in available_officials:
+            normalized["hosts"] = available_officials["hosts"]
+
+        if (
+            "available_commentators" in available_officials
+            and "commentators" not in normalized
+        ):
+            normalized["commentators"] = available_officials["available_commentators"]
+        if "available_hosts" in available_officials and "hosts" not in normalized:
+            normalized["hosts"] = available_officials["available_hosts"]
+
         return normalized
-            
+
     def _format_team_data(self, team_data: dict) -> dict:
         """Convert team data from fixture format to TeamPanel format"""
         try:
             # Convert players to the format expected by TeamPanel
             players = []
-            for player in team_data.get('players', []):
+            for player in team_data.get("players", []):
                 player_dict = {
-                    'jersey_number': player.get('jersey_number', 0),
-                    'name': player.get('full_name', ''),
-                    'id': player.get('id', ''),
-                    'position': player.get('position', ''),
-                    'selected': False  # Default to not selected
+                    "jersey_number": player.get("jersey_number", 0),
+                    "name": player.get("full_name", ""),
+                    "id": player.get("id", ""),
+                    "position": player.get("position", ""),
+                    "selected": False,  # Default to not selected
                 }
                 players.append(player_dict)
-            
+
             # Format team data
-            kits = team_data.get('kits', [])
-            
+            kits = team_data.get("kits", [])
+
             formatted_team = {
-                'id': team_data.get('id', ''),
-                'name': team_data.get('name', ''),
-                'full_name': team_data.get('full_name', ''),
-                'short_name': team_data.get('short_name', ''),
-                'manager': team_data.get('head_coach', ''),
-                'head_coach': team_data.get('head_coach', ''),
-                'formation': team_data.get('formation', 'Select Formation'),
-                'color_1': team_data.get('primary_color', '#2563eb'),
-                'color_2': team_data.get('secondary_color', '#000000'),
-                'color_mode': 'gradient' if team_data.get('secondary_color') else 'single',
-                'logo': team_data.get('logo'),  # Include logo from fixture
-                'logo_url': team_data.get('logo_url'),  # Include logo_url as fallback
-                'kit_image': team_data.get('kit_image', None),  # Kit image filename from JSON
-                'kits': kits,  # Kits array from JSON (home, away, third)
-                'players': players
+                "id": team_data.get("id", ""),
+                "name": team_data.get("name", ""),
+                "full_name": team_data.get("full_name", ""),
+                "short_name": team_data.get("short_name", ""),
+                "manager": team_data.get("head_coach", ""),
+                "head_coach": team_data.get("head_coach", ""),
+                "formation": team_data.get("formation", "Select Formation"),
+                "color_1": team_data.get("primary_color", "#2563eb"),
+                "color_2": team_data.get("secondary_color", "#000000"),
+                "color_mode": "gradient"
+                if team_data.get("secondary_color")
+                else "single",
+                "logo": team_data.get("logo"),  # Include logo from fixture
+                "logo_url": team_data.get("logo_url"),  # Include logo_url as fallback
+                "kit_image": team_data.get(
+                    "kit_image", None
+                ),  # Kit image filename from JSON
+                "kits": kits,  # Kits array from JSON (home, away, third)
+                "players": players,
             }
-            
+
             return formatted_team
-                    
-        except Exception as e:
+
+        except Exception:
             return team_data  # Return original data if formatting fails
 
-    def _normalize_officials_data(self, officials_raw: Any, tournament_fallback: Optional[dict] = None) -> Dict[str, Any]:
+    def _normalize_officials_data(
+        self, officials_raw: Any, tournament_fallback: Optional[dict] = None
+    ) -> Dict[str, Any]:
         """Normalize officials payload from fixture JSON for OfficialsTab."""
         if not officials_raw:
             return {}
@@ -640,7 +713,13 @@ class MatchSetupTab(QWidget):
                 continue
 
             if base_key.startswith("commentator"):
-                target = commentators_second if ("second" in base_key or "2nd" in base_key or (slot and slot > 3)) else commentators_first
+                target = (
+                    commentators_second
+                    if (
+                        "second" in base_key or "2nd" in base_key or (slot and slot > 3)
+                    )
+                    else commentators_first
+                )
                 position = (slot - 1) if slot else len(target)
                 if target is commentators_second and slot and slot > 3:
                     position = slot - 4
@@ -648,7 +727,9 @@ class MatchSetupTab(QWidget):
                 continue
 
             if base_key.startswith("guest"):
-                guest_id = f"guest{slot}" if slot else base_key.replace("guest_", "guest")
+                guest_id = (
+                    f"guest{slot}" if slot else base_key.replace("guest_", "guest")
+                )
                 entry = self._normalize_guest_entry(value)
                 if entry:
                     guests[guest_id] = entry
@@ -678,7 +759,9 @@ class MatchSetupTab(QWidget):
                     MatchSetupTab._assign_indexed_value(names, idx, name)
         elif isinstance(source, dict):
             for key, entry in source.items():
-                base, slot = MatchSetupTab._split_role_key(MatchSetupTab._canonicalize_role(key))
+                base, slot = MatchSetupTab._split_role_key(
+                    MatchSetupTab._canonicalize_role(key)
+                )
                 name = MatchSetupTab._extract_official_name(entry)
                 if name:
                     target_index = slot - 1 if slot else len(names)
@@ -739,16 +822,16 @@ class MatchSetupTab(QWidget):
     @staticmethod
     def _canonicalize_role(role: Any) -> str:
         """Convert arbitrary role text to a normalized snake_case key."""
-        return re.sub(r'[^a-z0-9]+', '_', str(role).strip().lower()).strip('_')
+        return re.sub(r"[^a-z0-9]+", "_", str(role).strip().lower()).strip("_")
 
     @staticmethod
     def _split_role_key(key: str) -> Tuple[str, Optional[int]]:
         """Split a normalized key into base and trailing integer slot."""
-        match = re.search(r'(\d+)$', key)
+        match = re.search(r"(\d+)$", key)
         if not match:
             return key, None
         slot = int(match.group(1))
-        base = key[:match.start()].rstrip('_')
+        base = key[: match.start()].rstrip("_")
         return base, slot
 
     @staticmethod
@@ -757,14 +840,23 @@ class MatchSetupTab(QWidget):
         if value is None:
             return ""
         if isinstance(value, dict):
-            for key in ("full_name", "name", "short_name", "display_name", "title", "label", "value", "text"):
+            for key in (
+                "full_name",
+                "name",
+                "short_name",
+                "display_name",
+                "title",
+                "label",
+                "value",
+                "text",
+            ):
                 if value.get(key):
                     return str(value[key])
             return ""
         if isinstance(value, (list, tuple)) and value:
             return MatchSetupTab._extract_official_name(value[0])
         return str(value) if value not in ("", None) else ""
-    
+
     def update_player_table(self, team_panel, team_data, team_type, radio_state):
         """Update player table with team data and apply saved selections (like old Game_Setting.py)
         Colors: during the initial fixture load, allow incoming fixture colors to initialize the panel.
@@ -772,67 +864,87 @@ class MatchSetupTab(QWidget):
         """
         try:
             # Get the appropriate selected rows and formation from global state
-            selected_rows = self.a_selected_rows if radio_state == "a" else self.b_selected_rows
-            formation = self.pool_a_formation if radio_state == "a" else self.pool_b_formation
-            allow_fixture_default = self.pool_a_allow_fixture_defaults if radio_state == "a" else self.pool_b_allow_fixture_defaults
-            
+            selected_rows = (
+                self.a_selected_rows if radio_state == "a" else self.b_selected_rows
+            )
+            formation = (
+                self.pool_a_formation if radio_state == "a" else self.pool_b_formation
+            )
+            allow_fixture_default = (
+                self.pool_a_allow_fixture_defaults
+                if radio_state == "a"
+                else self.pool_b_allow_fixture_defaults
+            )
+
             # Update the team panel with the data
             # Persist colors only during the initial fixture load
-            persist_color = bool(getattr(self, '_is_initial_fixture_load', False))
-            
+            persist_color = bool(getattr(self, "_is_initial_fixture_load", False))
+
             # Set restoring flag to prevent save during restoration
             team_panel.restoring_selections = True
-            
+
             try:
                 # IMPORTANT: Apply saved selections AFTER set_team_data populates the table
                 # Use QTimer to ensure populate_players completes first
                 def apply_selections_after_populate():
                     # Apply the saved selections to the player table (both panels should sync for same team)
                     # ALWAYS apply (even if empty) to restore cleared selections
-                    if hasattr(team_panel, 'player_table'):
+                    if hasattr(team_panel, "player_table"):
                         # Block signals to prevent premature triggering
                         team_panel.player_table.blockSignals(True)
-                        
+
                         # Apply selected rows (even if empty list)
                         team_panel.player_table.apply_selected_rows(list(selected_rows))
-                        
+
                         # Unblock signals
                         team_panel.player_table.blockSignals(False)
                         if selected_rows:
-                            print(f"Applied {len(selected_rows)} saved selections to {team_type} table")
+                            print(
+                                f"Applied {len(selected_rows)} saved selections to {team_type} table"
+                            )
                     else:
-                        print(f"Applied empty selections (cleared) to {team_type} table")
-                
+                        print(
+                            f"Applied empty selections (cleared) to {team_type} table"
+                        )
+
                 # Set team data first (this will populate the table)
                 preserve_formation = not allow_fixture_default
                 team_panel.set_team_data(
                     team_data,
                     f"Team {'A' if radio_state == 'a' else 'B'}",
                     persist_color=persist_color,
-                    preserve_formation=preserve_formation
+                    preserve_formation=preserve_formation,
                 )
-            
+
                 # Apply selections after table is populated (with a small delay to ensure populate_players completes)
                 QTimer.singleShot(50, apply_selections_after_populate)
             finally:
                 # Always reset restoring flag after a short delay to allow selection application
-                QTimer.singleShot(100, lambda: setattr(team_panel, 'restoring_selections', False))
-                
+                QTimer.singleShot(
+                    100, lambda: setattr(team_panel, "restoring_selections", False)
+                )
+
             # Decide which formation to apply:
             formation_to_apply = formation
             incoming_formation = team_data.get("formation")
-            if allow_fixture_default and (not formation or formation == "Select Formation") and incoming_formation:
+            if (
+                allow_fixture_default
+                and (not formation or formation == "Select Formation")
+                and incoming_formation
+            ):
                 formation_to_apply = incoming_formation
                 # Update global pools with fixture formation so future loads use it
                 if radio_state == "a":
                     self.pool_a_formation = incoming_formation
-                    self.pool_a_allow_fixture_defaults = False #pool defaults to false
+                    self.pool_a_allow_fixture_defaults = False  # pool defaults to false
                 else:
                     self.pool_b_formation = incoming_formation
                     self.pool_b_allow_fixture_defaults = False
 
             # Apply the resolved formation
-            formation_widget = getattr(getattr(team_panel, 'control_panel', None), 'formation_input', None)
+            formation_widget = getattr(
+                getattr(team_panel, "control_panel", None), "formation_input", None
+            )
             if formation_widget and formation_to_apply is not None:
                 formation_widget.blockSignals(True)
                 if formation_to_apply == "Select Formation":
@@ -841,22 +953,31 @@ class MatchSetupTab(QWidget):
                     formation_widget.setText(formation_to_apply)
                 formation_widget.blockSignals(False)
                 # Also update the panel's internal formation state since we blocked signals
-                if hasattr(team_panel, 'current_data_source'):
-                    if team_panel.current_data_source == "Team A" and hasattr(team_panel, 'team_a_formation'):
+                if hasattr(team_panel, "current_data_source"):
+                    if team_panel.current_data_source == "Team A" and hasattr(
+                        team_panel, "team_a_formation"
+                    ):
                         team_panel.team_a_formation = formation_to_apply
-                    elif team_panel.current_data_source == "Team B" and hasattr(team_panel, 'team_b_formation'):
+                    elif team_panel.current_data_source == "Team B" and hasattr(
+                        team_panel, "team_b_formation"
+                    ):
                         team_panel.team_b_formation = formation_to_apply
-            
+
             # Update formation labels in FormationPanel
-            if hasattr(team_panel, 'formation_panel'):
+            if hasattr(team_panel, "formation_panel"):
                 if radio_state == "a":
-                    team_panel.formation_panel.update_team_a_formation(formation_to_apply or "Select Formation")
+                    team_panel.formation_panel.update_team_a_formation(
+                        formation_to_apply or "Select Formation"
+                    )
                 else:
-                    team_panel.formation_panel.update_team_b_formation(formation_to_apply or "Select Formation")
+                    team_panel.formation_panel.update_team_b_formation(
+                        formation_to_apply or "Select Formation"
+                    )
 
             # Re-apply formation after the UI settles to ensure markers render immediately
             # Delay slightly so table checkboxes and combo changes are fully processed
-            if hasattr(team_panel, 'apply_current_formation'):
+            if hasattr(team_panel, "apply_current_formation"):
+
                 def apply_and_persist():
                     team_panel.apply_current_formation()
                     current_form = formation_to_apply or "Select Formation"
@@ -864,98 +985,135 @@ class MatchSetupTab(QWidget):
                         self.pool_a_formation = current_form
                     else:
                         self.pool_b_formation = current_form
+
                 QTimer.singleShot(0, apply_and_persist)
                 # No need to force scaling since we now use consistent scene rectangles
-            
-            if hasattr(team_panel, 'refresh_formation_labels'):
+
+            if hasattr(team_panel, "refresh_formation_labels"):
                 team_panel.refresh_formation_labels()
-                
-        except Exception as e:
+
+        except Exception:
             pass
-    
+
     def on_home_team_data_source_changed(self):
         """Handle home team data source change (like old Game_Setting.py)"""
         try:
             # Get current data source from home team panel
             data_source = self.home_team_panel.formation_panel.get_current_data_source()
             radio_state = "a" if data_source == "Team A" else "b"
-            
+
             # Save current home team state to global pools BEFORE switching
             self.save_home_team_state_to_pools()
-            
+
             # Update away team panel to show opposite selection
             if radio_state == "a":
-                self.away_team_panel.formation_panel.set_data_source_without_emit("Team B")
+                self.away_team_panel.formation_panel.set_data_source_without_emit(
+                    "Team B"
+                )
             else:
-                self.away_team_panel.formation_panel.set_data_source_without_emit("Team A")
-            
+                self.away_team_panel.formation_panel.set_data_source_without_emit(
+                    "Team A"
+                )
+
             # Load appropriate team data and apply saved state
             if radio_state == "a":
                 # Home team shows Team A data, Away team shows Team B data
-                if hasattr(self, 'home_team_data') and self.home_team_data:
-                    self.update_player_table(self.home_team_panel, self.home_team_data, "home", "a")
-                if hasattr(self, 'away_team_data') and self.away_team_data:
-                    self.update_player_table(self.away_team_panel, self.away_team_data, "away", "b")
+                if hasattr(self, "home_team_data") and self.home_team_data:
+                    self.update_player_table(
+                        self.home_team_panel, self.home_team_data, "home", "a"
+                    )
+                if hasattr(self, "away_team_data") and self.away_team_data:
+                    self.update_player_table(
+                        self.away_team_panel, self.away_team_data, "away", "b"
+                    )
             else:
                 # Home team shows Team B data, Away team shows Team A data
-                if hasattr(self, 'away_team_data') and self.away_team_data:
-                    self.update_player_table(self.home_team_panel, self.away_team_data, "home", "b")
-                if hasattr(self, 'home_team_data') and self.home_team_data:
-                    self.update_player_table(self.away_team_panel, self.home_team_data, "away", "a")
-            
-        except Exception as e:
+                if hasattr(self, "away_team_data") and self.away_team_data:
+                    self.update_player_table(
+                        self.home_team_panel, self.away_team_data, "home", "b"
+                    )
+                if hasattr(self, "home_team_data") and self.home_team_data:
+                    self.update_player_table(
+                        self.away_team_panel, self.home_team_data, "away", "a"
+                    )
+
+        except Exception:
             pass
-            
+
     def on_away_team_data_source_changed(self):
         """Handle away team data source change (like old Game_Setting.py)"""
         try:
             # Get current data source from away team panel
             data_source = self.away_team_panel.formation_panel.get_current_data_source()
             radio_state = "a" if data_source == "Team A" else "b"
-            
+
             # Save current away team state to global pools BEFORE switching
             self.save_away_team_state_to_pools()
-            
+
             # Update home team panel to show opposite selection
             if radio_state == "a":
-                self.home_team_panel.formation_panel.set_data_source_without_emit("Team B")
+                self.home_team_panel.formation_panel.set_data_source_without_emit(
+                    "Team B"
+                )
             else:
-                self.home_team_panel.formation_panel.set_data_source_without_emit("Team A")
-            
+                self.home_team_panel.formation_panel.set_data_source_without_emit(
+                    "Team A"
+                )
+
             # Load appropriate team data and apply saved state
             if radio_state == "a":
                 # Away team shows Team A data, Home team shows Team B data
-                if hasattr(self, 'home_team_data') and self.home_team_data:
-                    self.update_player_table(self.away_team_panel, self.home_team_data, "away", "a")
-                if hasattr(self, 'away_team_data') and self.away_team_data:
-                    self.update_player_table(self.home_team_panel, self.away_team_data, "home", "b")
+                if hasattr(self, "home_team_data") and self.home_team_data:
+                    self.update_player_table(
+                        self.away_team_panel, self.home_team_data, "away", "a"
+                    )
+                if hasattr(self, "away_team_data") and self.away_team_data:
+                    self.update_player_table(
+                        self.home_team_panel, self.away_team_data, "home", "b"
+                    )
             else:
                 # Away team shows Team B data, Home team shows Team A data
-                if hasattr(self, 'away_team_data') and self.away_team_data:
-                    self.update_player_table(self.away_team_panel, self.away_team_data, "away", "b")
-                if hasattr(self, 'home_team_data') and self.home_team_data:
-                    self.update_player_table(self.home_team_panel, self.home_team_data, "home", "a")
-            
-        except Exception as e:
+                if hasattr(self, "away_team_data") and self.away_team_data:
+                    self.update_player_table(
+                        self.away_team_panel, self.away_team_data, "away", "b"
+                    )
+                if hasattr(self, "home_team_data") and self.home_team_data:
+                    self.update_player_table(
+                        self.home_team_panel, self.home_team_data, "home", "a"
+                    )
+
+        except Exception:
             pass
-    
+
     def save_home_team_state_to_pools(self):
         """Save home team state to global pools"""
         try:
             # Use OLD data source from current_data_source (before it was updated)
             # This is what we're leaving, so we save to this pool
-            home_data_source = self.home_team_panel.current_data_source if hasattr(self.home_team_panel, 'current_data_source') else self.home_team_panel.formation_panel.get_current_data_source()
-            
+            home_data_source = (
+                self.home_team_panel.current_data_source
+                if hasattr(self.home_team_panel, "current_data_source")
+                else self.home_team_panel.formation_panel.get_current_data_source()
+            )
+
             # Get current selections and formation from home team panel
             # Note: on_formation_data_changed in team_panel.py already saves selections BEFORE clearing the table
             # So if the table is already cleared (empty selections), don't overwrite the saved selections
-            if hasattr(self.home_team_panel, 'player_table'):
+            if hasattr(self.home_team_panel, "player_table"):
                 home_selections = self.home_team_panel.player_table.get_selected_rows()
                 if home_data_source == "Team A":
-                    home_formation = getattr(self.home_team_panel, "team_a_formation", TeamConstants.SELECT_FORMATION)
+                    home_formation = getattr(
+                        self.home_team_panel,
+                        "team_a_formation",
+                        TeamConstants.SELECT_FORMATION,
+                    )
                 else:
-                    home_formation = getattr(self.home_team_panel, "team_b_formation", TeamConstants.SELECT_FORMATION)
-                
+                    home_formation = getattr(
+                        self.home_team_panel,
+                        "team_b_formation",
+                        TeamConstants.SELECT_FORMATION,
+                    )
+
                 # Only save if selections are not empty OR if the pool for this data source is already empty
                 # This prevents overwriting saved selections with empty set after table is cleared
                 if home_selections:
@@ -975,27 +1133,39 @@ class MatchSetupTab(QWidget):
                     self.b_selected_rows = home_selections.copy()
                     self.pool_b_formation = home_formation
                 # Otherwise, selections are empty but pool has saved selections - don't overwrite
-            
-        except Exception as e:
+
+        except Exception:
             pass
-    
+
     def save_away_team_state_to_pools(self):
         """Save away team state to global pools"""
         try:
             # Use OLD data source from current_data_source (before it was updated)
             # This is what we're leaving, so we save to this pool
-            away_data_source = self.away_team_panel.current_data_source if hasattr(self.away_team_panel, 'current_data_source') else self.away_team_panel.formation_panel.get_current_data_source()
-            
+            away_data_source = (
+                self.away_team_panel.current_data_source
+                if hasattr(self.away_team_panel, "current_data_source")
+                else self.away_team_panel.formation_panel.get_current_data_source()
+            )
+
             # Get current selections and formation from away team panel
             # Note: on_formation_data_changed in team_panel.py already saves selections BEFORE clearing the table
             # So if the table is already cleared (empty selections), don't overwrite the saved selections
-            if hasattr(self.away_team_panel, 'player_table'):
+            if hasattr(self.away_team_panel, "player_table"):
                 away_selections = self.away_team_panel.player_table.get_selected_rows()
                 if away_data_source == "Team A":
-                    away_formation = getattr(self.away_team_panel, "team_a_formation", TeamConstants.SELECT_FORMATION)
+                    away_formation = getattr(
+                        self.away_team_panel,
+                        "team_a_formation",
+                        TeamConstants.SELECT_FORMATION,
+                    )
                 else:
-                    away_formation = getattr(self.away_team_panel, "team_b_formation", TeamConstants.SELECT_FORMATION)
-                
+                    away_formation = getattr(
+                        self.away_team_panel,
+                        "team_b_formation",
+                        TeamConstants.SELECT_FORMATION,
+                    )
+
                 # Only save if selections are not empty OR if the pool for this data source is already empty
                 # This prevents overwriting saved selections with empty set after table is cleared
                 if away_selections:
@@ -1015,41 +1185,44 @@ class MatchSetupTab(QWidget):
                     self.b_selected_rows = away_selections.copy()
                     self.pool_b_formation = away_formation
                 # Otherwise, selections are empty but pool has saved selections - don't overwrite
-            
-        except Exception as e:
+
+        except Exception:
             pass
-            
-            
+
     def create_match(self):
         """Create a new match with current data"""
         try:
             match_data = self.get_match_data()
-            
+
             # Validate match data
             validation_errors = self.validate_match_data(match_data)
             if validation_errors:
-                error_msg = "Please fix the following errors:\n\n" + "\n".join(validation_errors)
+                error_msg = "Please fix the following errors:\n\n" + "\n".join(
+                    validation_errors
+                )
                 QMessageBox.warning(self, "Validation Error", error_msg)
                 return
-            
+
             # Show progress dialog
             progress = QProgressDialog("Creating match...", "Cancel", 0, 100, self)
             progress.setMinimumWidth(420)
             progress.setWindowModality(Qt.WindowModal)
             progress.show()
-            
+
             # Simulate match creation process
             QTimer.singleShot(100, lambda: progress.setValue(25))
             QTimer.singleShot(200, lambda: progress.setValue(50))
             QTimer.singleShot(300, lambda: progress.setValue(75))
             QTimer.singleShot(400, lambda: progress.setValue(100))
-            
+
             # Create match using backend service
-            QTimer.singleShot(500, lambda: self._finish_match_creation(match_data, progress))
-                
+            QTimer.singleShot(
+                500, lambda: self._finish_match_creation(match_data, progress)
+            )
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to create match: {str(e)}")
-            
+
     def _finish_match_creation(self, match_data: dict, progress: QProgressDialog):
         """Finish the match creation process"""
         try:
@@ -1057,106 +1230,112 @@ class MatchSetupTab(QWidget):
             # For now, we'll just emit the signal
             match_id = f"match_{self.get_match_number()}_{hash(str(match_data))}"
             self.current_match_id = match_id
-            
+
             progress.close()
-            
+
             # Emit match created signal
             self.match_created.emit(match_id)
-            
+
             # CRITICAL: Emit match_data_changed signal with complete data so Play On and Subs/Penalty tabs become operational
             # This ensures both tabs receive the match data with playing 11 and substitutions
-            match_data['match_id'] = match_id
-            match_data['status'] = 'created'  # Match is now created
+            match_data["match_id"] = match_id
+            match_data["status"] = "created"  # Match is now created
             self.match_data_changed.emit(match_data)
 
             try:
                 sync_match_snapshot(match_id, match_data)
             except Exception as exc:
                 print(f"[MatchSetupTab] Backend sync failed: {exc}")
-            
+
             # Show success message
             QMessageBox.information(
                 self,
                 "Success",
-                f"Match #{self.get_match_number()} created successfully!\n\nPlay On and Subs & Penalty tabs are now operational."
+                f"Match #{self.get_match_number()} created successfully!\n\nPlay On and Subs & Penalty tabs are now operational.",
             )
-            
+
         except Exception as e:
             progress.close()
-            QMessageBox.critical(self, "Error", f"Failed to finish match creation: {str(e)}")
-    
+            QMessageBox.critical(
+                self, "Error", f"Failed to finish match creation: {str(e)}"
+            )
+
     def validate_match_data(self, match_data: dict) -> list:
         """Validate match data and return list of errors"""
         errors = []
-        
+
         try:
             # Validate home team
-            home_team = match_data.get('home_team', {})
-            if not home_team.get('name'):
+            home_team = match_data.get("home_team", {})
+            if not home_team.get("name"):
                 errors.append("Home team name is required")
-            
+
             # Validate away team
-            away_team = match_data.get('away_team', {})
-            if not away_team.get('name'):
+            away_team = match_data.get("away_team", {})
+            if not away_team.get("name"):
                 errors.append("Away team name is required")
-            
+
             # Validate officials
-            officials = match_data.get('officials', {})
-            if not officials.get('referee'):
+            officials = match_data.get("officials", {})
+            if not officials.get("referee"):
                 errors.append("Referee is required")
-            
+
             # Validate team formations
-            if home_team.get('formation') == "Select Formation":
+            if home_team.get("formation") == "Select Formation":
                 errors.append("Home team formation must be selected")
-            
-            if away_team.get('formation') == "Select Formation":
+
+            if away_team.get("formation") == "Select Formation":
                 errors.append("Away team formation must be selected")
-            
+
             # Validate player counts - check playing_11 first, then fall back to selected flag
-            home_playing_11 = home_team.get('playing_11', [])
+            home_playing_11 = home_team.get("playing_11", [])
             if not home_playing_11:
                 # Fallback: check selected flag in players array
-                home_players = home_team.get('players', [])
-                home_playing_11 = [p for p in home_players if p.get('selected', False)]
-            
+                home_players = home_team.get("players", [])
+                home_playing_11 = [p for p in home_players if p.get("selected", False)]
+
             if len(home_playing_11) != 11:
-                errors.append(f"Home team must have exactly 11 players selected (playing 11). Current: {len(home_playing_11)}")
-            
-            away_playing_11 = away_team.get('playing_11', [])
+                errors.append(
+                    f"Home team must have exactly 11 players selected (playing 11). Current: {len(home_playing_11)}"
+                )
+
+            away_playing_11 = away_team.get("playing_11", [])
             if not away_playing_11:
                 # Fallback: check selected flag in players array
-                away_players = away_team.get('players', [])
-                away_playing_11 = [p for p in away_players if p.get('selected', False)]
-            
+                away_players = away_team.get("players", [])
+                away_playing_11 = [p for p in away_players if p.get("selected", False)]
+
             if len(away_playing_11) != 11:
-                errors.append(f"Away team must have exactly 11 players selected (playing 11). Current: {len(away_playing_11)}")
-                        
+                errors.append(
+                    f"Away team must have exactly 11 players selected (playing 11). Current: {len(away_playing_11)}"
+                )
+
         except Exception as e:
             errors.append(f"Validation error: {str(e)}")
-        
+
         return errors
-    
+
     def load_match_data(self, match_data: dict):
         """Load match data into the UI components"""
         try:
             # Load match number
-            if 'match_number' in match_data:
-                self.set_match_number(match_data['match_number'], emit_change=False)
-            
+            if "match_number" in match_data:
+                self.set_match_number(match_data["match_number"], emit_change=False)
+
             # Load team data
-            if 'home_team' in match_data:
-                self.home_team_panel.load_team_data(match_data['home_team'])
-            
-            if 'away_team' in match_data:
-                self.away_team_panel.load_team_data(match_data['away_team'])
-            
+            if "home_team" in match_data:
+                self.home_team_panel.load_team_data(match_data["home_team"])
+
+            if "away_team" in match_data:
+                self.away_team_panel.load_team_data(match_data["away_team"])
+
             # Load officials data
-            if 'officials' in match_data:
-                self.officials_tab.load_officials_data(match_data['officials'])
-            
-        except Exception as e:
+            if "officials" in match_data:
+                self.officials_tab.load_officials_data(match_data["officials"])
+
+        except Exception:
             pass
-        
+
     def get_tab_style(self) -> str:
         """Get styling for the tab widget"""
         return """
@@ -1169,11 +1348,11 @@ class MatchSetupTab(QWidget):
                 alignment: left;
             }
         """
-        
+
     def get_tab_button_style(self, active: bool) -> str:
         """Get styling for tab buttons"""
         if active:
-                return """
+            return """
                         QPushButton {
                             background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                                 stop:0 #3b82f6, stop:1 #1d4ed8);
@@ -1207,7 +1386,7 @@ class MatchSetupTab(QWidget):
                     color: white;
                 }
             """
-    
+
     def get_create_button_style(self) -> str:
         """Get styling for the create match button"""
         return """
@@ -1254,19 +1433,18 @@ class MatchSetupTab(QWidget):
             self.match_input.blockSignals(False)
         if emit_change:
             self.on_data_changed()
-    
+
     def increment_match_number(self):
         """Increment match number"""
         new_value = min(self.get_match_number() + 1, 1000)
         self.set_match_number(new_value)
-    
+
     def decrement_match_number(self):
         """Decrement match number"""
         new_value = max(self.get_match_number() - 1, 0)
         self.set_match_number(new_value)
-    
+
     def on_match_number_changed(self):
         """Handle manual match number input"""
         value = self.get_match_number()
         self.set_match_number(value)
-    

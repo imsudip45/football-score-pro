@@ -3,11 +3,17 @@ Formation Panel Widget for Football Score Pro 2.0
 Panel for formation selection and team data source
 """
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QGridLayout, QFrame, QRadioButton, 
-    QLabel, QButtonGroup, QSizePolicy
-)
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (
+    QButtonGroup,
+    QFrame,
+    QGridLayout,
+    QLabel,
+    QRadioButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class FormationPanel(QWidget):
@@ -47,10 +53,14 @@ class FormationPanel(QWidget):
         self.radio_group.addButton(self.team_a_radio)
 
         self.team_a_formation_label = QLabel("Select Formation")
-        self.team_a_formation_label.setAlignment(Qt.AlignCenter)
+        self.team_a_formation_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.team_a_formation_label.setStyleSheet(self.get_formation_label_style())
-        self.team_a_formation_label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
-        self._team_a_label_min_width = max(self.team_a_formation_label.sizeHint().width(), 140)
+        self.team_a_formation_label.setSizePolicy(
+            QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed
+        )
+        self._team_a_label_min_width = max(
+            self.team_a_formation_label.sizeHint().width(), 140
+        )
         self.team_a_formation_label.setMinimumWidth(self._team_a_label_min_width)
         self.team_a_formation_label.setFixedWidth(self._team_a_label_min_width)
 
@@ -61,10 +71,14 @@ class FormationPanel(QWidget):
         self.radio_group.addButton(self.team_b_radio)
 
         self.team_b_formation_label = QLabel("Select Formation")
-        self.team_b_formation_label.setAlignment(Qt.AlignCenter)
+        self.team_b_formation_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.team_b_formation_label.setStyleSheet(self.get_formation_label_style())
-        self.team_b_formation_label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
-        self._team_b_label_min_width = max(self.team_b_formation_label.sizeHint().width(), 140)
+        self.team_b_formation_label.setSizePolicy(
+            QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed
+        )
+        self._team_b_label_min_width = max(
+            self.team_b_formation_label.sizeHint().width(), 140
+        )
         self.team_b_formation_label.setMinimumWidth(self._team_b_label_min_width)
         self.team_b_formation_label.setFixedWidth(self._team_b_label_min_width)
 
@@ -131,7 +145,7 @@ class FormationPanel(QWidget):
             return
         if self._ignore_toggle:
             return
-        
+
         # Determine which data source was selected
         if self.team_a_radio and self.team_a_radio.isChecked():
             data_source = "Team A"
@@ -139,13 +153,14 @@ class FormationPanel(QWidget):
             data_source = "Team B"
         else:
             return
-            
+
         # Emit signal with data source information
         self.data_changed.emit()
-        
+
         # Notify parent to switch data source
-        if hasattr(self.parent(), 'switch_data_source'):
-            self.parent().switch_data_source(data_source)
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "switch_data_source"):
+            parent.switch_data_source(data_source)  # type: ignore[union-attr]
 
     def set_data_source_without_emit(self, data_source: str):
         """Set data source without emitting signal (for syncing)"""
@@ -178,30 +193,34 @@ class FormationPanel(QWidget):
             if self.team_a_formation_label:
                 self.team_a_formation_label.setText(formation)
                 hint = self.team_a_formation_label.sizeHint().width()
-                if maintain_width and hasattr(self, '_team_a_label_min_width'):
-                    self.team_a_formation_label.setFixedWidth(self._team_a_label_min_width)
+                if maintain_width and hasattr(self, "_team_a_label_min_width"):
+                    self.team_a_formation_label.setFixedWidth(
+                        self._team_a_label_min_width
+                    )
                 else:
-                    width = max(hint, getattr(self, '_team_a_label_min_width', 140))
+                    width = max(hint, getattr(self, "_team_a_label_min_width", 140))
                     self._team_a_label_min_width = width
                     self.team_a_formation_label.setFixedWidth(width)
         except Exception as e:
             print(f"Error updating Team A formation label: {e}")
-    
+
     def update_team_b_formation(self, formation: str, maintain_width: bool = False):
         """Update only Team B formation label"""
         try:
             if self.team_b_formation_label:
                 self.team_b_formation_label.setText(formation)
                 hint = self.team_b_formation_label.sizeHint().width()
-                if maintain_width and hasattr(self, '_team_b_label_min_width'):
-                    self.team_b_formation_label.setFixedWidth(self._team_b_label_min_width)
+                if maintain_width and hasattr(self, "_team_b_label_min_width"):
+                    self.team_b_formation_label.setFixedWidth(
+                        self._team_b_label_min_width
+                    )
                 else:
-                    width = max(hint, getattr(self, '_team_b_label_min_width', 140))
+                    width = max(hint, getattr(self, "_team_b_label_min_width", 140))
                     self._team_b_label_min_width = width
                     self.team_b_formation_label.setFixedWidth(width)
         except Exception as e:
             print(f"Error updating Team B formation label: {e}")
-    
+
     def update_radio_texts(self, team_a_short_name: str, team_b_short_name: str):
         """Update both radio button labels with team short names."""
         try:
@@ -290,7 +309,7 @@ class FormationPanel(QWidget):
                 border: 2px solid #059669;
                 color: #059669;
                 padding: 8px 0px;
-           
+
                 border-radius: 8px;
                 font-weight: 500;
                 font-size: 13px;
