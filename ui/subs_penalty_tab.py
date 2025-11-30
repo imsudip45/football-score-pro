@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 )
 
 from .backend_service import BackendService
+from .play_on_tab import TimeColumnDelegate
 
 # Local color palette matching Play On (no external imports)
 COLORS = {
@@ -326,7 +327,7 @@ class SubsAndPenaltyTab(QWidget):
 
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(0)
+        layout.setSpacing(10)
 
         # Team label with deploy button in top-right
         team_label_container = QFrame()
@@ -470,6 +471,9 @@ class SubsAndPenaltyTab(QWidget):
             QTableWidget.EditTrigger.DoubleClicked
             | QTableWidget.EditTrigger.EditKeyPressed
         )
+        # Disable selection highlighting
+        sub_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        sub_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         # Set header labels
         header_labels = [
@@ -498,67 +502,15 @@ class SubsAndPenaltyTab(QWidget):
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # Set custom delegate for time column to set border-radius to 0
-        from PySide6.QtCore import QRegularExpression
-        from PySide6.QtGui import QRegularExpressionValidator
-        from PySide6.QtWidgets import QStyledItemDelegate
-
-        class TimeColumnDelegate(QStyledItemDelegate):
-            def createEditor(self, parent, option, index):
-                editor = super().createEditor(parent, option, index)
-                if editor:
-                    editor.setFont(QFont("Verdana", 12))
-                    editor.setStyleSheet(TIME_EDITOR_STYLE)
-                    # Add validator to only allow numbers and colon (for time format)
-                    # Pattern allows: digits and colon, max 6 chars (e.g., "104:56" or "90:00")
-                    # This allows up to 5 digits plus colon symbol, no alphabets
-                    regex = QRegularExpression(r"^[0-9:]{0,6}$")
-                    validator = QRegularExpressionValidator(regex, editor)
-                    editor.setValidator(validator)
-                    # Also set max length to prevent too long input
-                    editor.setMaxLength(6)
-                return editor
-
-            def setModelData(self, editor, model, index):
-                """Format the input to MM:SS or MMM:SS format when 3, 4, or 5 digits are entered"""
-                text = editor.text().strip()
-
-                # Remove any existing colons to get just digits
-                digits_only = text.replace(":", "")
-
-                # Format based on number of digits
-                if len(digits_only) == 3:
-                    # Format as 0X:XX (e.g., "345" -> "03:45")
-                    minutes = digits_only[0].zfill(2)
-                    seconds = digits_only[1:3].zfill(2)
-                    formatted_text = f"{minutes}:{seconds}"
-                elif len(digits_only) == 4:
-                    # Format as XX:XX (e.g., "2345" -> "23:45")
-                    minutes = digits_only[0:2]
-                    seconds = digits_only[2:4]
-                    formatted_text = f"{minutes}:{seconds}"
-                elif len(digits_only) == 5:
-                    # Format as XXX:XX (e.g., "10456" -> "104:56")
-                    minutes = digits_only[0:3]
-                    seconds = digits_only[3:5]
-                    formatted_text = f"{minutes}:{seconds}"
-                elif ":" in text:
-                    # Already has colon, use as is (but ensure proper format)
-                    parts = text.split(":")
-                    if len(parts) == 2:
-                        minutes = parts[0]
-                        seconds = parts[1].zfill(2)
-                        formatted_text = f"{minutes}:{seconds}"
-                    else:
-                        formatted_text = text
-                else:
-                    # Use text as is if it doesn't match patterns
-                    formatted_text = text
-
-                # Set the formatted text to the model
-                model.setData(index, formatted_text, Qt.ItemDataRole.EditRole)
+        # Import shared TimeColumnDelegate from play_on_tab
 
         time_delegate = TimeColumnDelegate()
         sub_table.setItemDelegateForColumn(0, time_delegate)
+
+        # Connect header click to toggle Export and Lock columns
+        sub_table.horizontalHeader().sectionClicked.connect(
+            lambda col, table=sub_table: self.on_substitution_header_clicked(table, col)
+        )
 
         # Substitution table starts empty - rows will be added via + button
 
@@ -1276,8 +1228,8 @@ class SubsAndPenaltyTab(QWidget):
         # Table
         table = QTableWidget()
         table.setRowCount(0)
-        table.setColumnCount(7)
-        headers = ["Num", "Name", "Goal", "Missed", "Export", "Lock", "Reset"]
+        table.setColumnCount(6)
+        headers = ["Num", "Name", "Goal", "Missed", "Lock", "Reset"]
         table.setHorizontalHeaderLabels(headers)
         table.setStyleSheet(f"""
             QTableWidget {{ background-color: transparent; color: {COLORS["text"]}; font-family: 'Verdana'; font-size: 10px; border: 1px solid gray; border-radius: 5px; gridline-color: {COLORS["border"]}; }}
@@ -1291,12 +1243,14 @@ class SubsAndPenaltyTab(QWidget):
         table.setColumnWidth(1, 240)  # Name
         table.setColumnWidth(2, 40)  # Goal (reduced width)
         table.setColumnWidth(3, 50)  # Missed
-        table.setColumnWidth(4, 46)  # Export
-        table.setColumnWidth(5, 40)  # Lock
-        table.setColumnWidth(6, 40)  # Reset
+        table.setColumnWidth(4, 40)  # Lock
+        table.setColumnWidth(5, 40)  # Reset
         table.verticalHeader().setVisible(False)
         table.horizontalHeader().setVisible(True)
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        # Disable selection highlighting
+        table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         header = table.horizontalHeader()
         header.setStretchLastSection(False)
         header.setMinimumSectionSize(1)
@@ -1326,6 +1280,11 @@ class SubsAndPenaltyTab(QWidget):
                 item.setForeground(QColor("#00FF00"))  # Green
             elif label == "Missed":
                 item.setForeground(QColor("#FF0000"))  # Red
+
+        # Connect header click to toggle Lock column only
+        header.sectionClicked.connect(
+            lambda col, tbl=table: self.on_penalty_header_clicked(tbl, col)
+        )
 
         # Penalty table starts empty - rows will be added via + button
 
@@ -1535,6 +1494,38 @@ class SubsAndPenaltyTab(QWidget):
                     name_item.setToolTip(tooltip)
                     item_num.setToolTip(tooltip)
                     item_pos.setToolTip(tooltip)
+                else:
+                    # Check if player has yellow card
+                    yellow_card_set = set()
+                    try:
+                        main_window = self.window()
+                        if main_window and hasattr(main_window, "play_on_tab"):
+                            play_on_tab = main_window.play_on_tab
+                            if hasattr(play_on_tab, "yellow_card_players"):
+                                normalized_team = (
+                                    "home" if team_type == "home" else "away"
+                                )
+                                yellow_card_set = play_on_tab.yellow_card_players.get(
+                                    normalized_team, set()
+                                )
+                    except Exception:
+                        yellow_card_set = set()
+
+                    if num in yellow_card_set:
+                        # Yellow highlight for players with yellow cards
+                        yellow_color = QColor("#fbbf24")  # Yellow/amber color
+                        name_item.setForeground(yellow_color)
+                        item_num.setForeground(yellow_color)
+                        item_pos.setForeground(yellow_color)
+                        name_item.setBackground(
+                            QColor("#78350f")
+                        )  # Dark amber background
+                        item_num.setBackground(QColor("#78350f"))
+                        item_pos.setBackground(QColor("#78350f"))
+                        tooltip = "Yellow card — player is on a caution."
+                        name_item.setToolTip(tooltip)
+                        item_num.setToolTip(tooltip)
+                        item_pos.setToolTip(tooltip)
                 if is_penalty_popup:
                     g, m = _count_penalties_for_jersey(num)
                     total_goals += g
@@ -1854,7 +1845,7 @@ class SubsAndPenaltyTab(QWidget):
             )
             table.setCellWidget(row, 1, name_btn)
 
-            # Goal/Missed/Export/Lock checkboxes
+            # Goal/Missed/Lock checkboxes
             def _mk_cb(style):
                 cb = QCheckBox()
                 cb.setStyleSheet(style)
@@ -1866,13 +1857,10 @@ class SubsAndPenaltyTab(QWidget):
             missed = _mk_cb(
                 "QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #B0B4BB; border-radius: 2px; } QCheckBox::indicator:checked { background-color: #FF0000; border: 1px solid #B0B4BB; border-radius: 2px; }"
             )
-            export = _mk_cb(
-                "QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #B0B4BB; border-radius: 2px; } QCheckBox::indicator:checked { background-color: #10B981; border: 1px solid #059669; border-radius: 2px; }"
-            )
             lock = _mk_cb(
                 "QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid #B0B4BB; border-radius: 2px; } QCheckBox::indicator:checked { background-color: #FF0000; border: 1px solid #B0B4BB; border-radius: 2px; }"
             )
-            for cb, col in [(goal, 2), (missed, 3), (export, 4), (lock, 5)]:
+            for cb, col in [(goal, 2), (missed, 3), (lock, 4)]:
                 w = QWidget()
                 layout = QHBoxLayout(w)
                 layout.addWidget(cb)
@@ -1908,7 +1896,7 @@ class SubsAndPenaltyTab(QWidget):
             )
             reset_btn.setProperty("table", table)
             reset_btn.clicked.connect(self.on_reset_clicked)
-            table.setCellWidget(row, 6, reset_btn)
+            table.setCellWidget(row, 5, reset_btn)
 
         except Exception as e:
             print(f"Error in _initialize_penalty_row: {e}")
@@ -1945,7 +1933,7 @@ class SubsAndPenaltyTab(QWidget):
             if not table or not checkbox:
                 return None
             for row in range(table.rowCount()):
-                widget = table.cellWidget(row, 5)
+                widget = table.cellWidget(row, 4)
                 if not widget:
                     continue
                 cb = widget.findChild(QCheckBox)
@@ -1981,14 +1969,14 @@ class SubsAndPenaltyTab(QWidget):
             name_widget = table.cellWidget(row, 1)
             if name_widget:
                 name_widget.setEnabled(not is_locked)
-            for col in (2, 3, 4):
+            for col in (2, 3):
                 widget = table.cellWidget(row, col)
                 if not widget:
                     continue
                 cb = widget.findChild(QCheckBox)
                 if cb:
                     cb.setEnabled(not is_locked)
-            reset_widget = table.cellWidget(row, 6)
+            reset_widget = table.cellWidget(row, 5)
             if reset_widget:
                 reset_widget.setEnabled(not is_locked)
         except Exception as exc:
@@ -1999,7 +1987,7 @@ class SubsAndPenaltyTab(QWidget):
         try:
             if row < 0 or row >= table.rowCount():
                 return False
-            widget = table.cellWidget(row, 5)
+            widget = table.cellWidget(row, 4)
             if not widget:
                 return False
             cb = widget.findChild(QCheckBox)
@@ -3582,8 +3570,7 @@ class SubsAndPenaltyTab(QWidget):
                         "name": name_text,
                         "goal": self._is_checkbox_checked(table.cellWidget(row, 2)),
                         "missed": self._is_checkbox_checked(table.cellWidget(row, 3)),
-                        "exported": self._is_checkbox_checked(table.cellWidget(row, 4)),
-                        "locked": self._is_checkbox_checked(table.cellWidget(row, 5)),
+                        "locked": self._is_checkbox_checked(table.cellWidget(row, 4)),
                     }
                 )
         except Exception as exc:
@@ -3642,10 +3629,7 @@ class SubsAndPenaltyTab(QWidget):
                     table.cellWidget(row_index, 3), row_data.get("missed")
                 )
                 self._set_checkbox_checked(
-                    table.cellWidget(row_index, 4), row_data.get("exported")
-                )
-                self._set_checkbox_checked(
-                    table.cellWidget(row_index, 5), row_data.get("locked")
+                    table.cellWidget(row_index, 4), row_data.get("locked")
                 )
                 table.showRow(row_index)
         except Exception as exc:
@@ -3702,6 +3686,72 @@ class SubsAndPenaltyTab(QWidget):
             )
         except Exception as exc:
             print(f"Error loading Subs & Penalty state: {exc}")
+
+    def on_penalty_header_clicked(self, table, column):
+        """Toggle all checkboxes in Lock (col 4) column when header is clicked"""
+        if column != 4:  # Only handle Lock column for penalty panels
+            return
+
+        # Count checked vs unchecked to determine toggle direction
+        checked_count = 0
+        total_count = 0
+
+        for row in range(table.rowCount()):
+            if table.isRowHidden(row):
+                continue
+            widget = table.cellWidget(row, column)
+            if widget:
+                cb = widget.findChild(QCheckBox)
+                if cb:
+                    total_count += 1
+                    if cb.isChecked():
+                        checked_count += 1
+
+        # If more than half are checked, uncheck all; otherwise check all
+        new_state = checked_count < (total_count / 2)
+
+        # Toggle all checkboxes in this column
+        for row in range(table.rowCount()):
+            if table.isRowHidden(row):
+                continue
+            widget = table.cellWidget(row, column)
+            if widget:
+                cb = widget.findChild(QCheckBox)
+                if cb:
+                    cb.setChecked(new_state)
+
+    def on_substitution_header_clicked(self, table, column):
+        """Toggle all checkboxes in Export (col 5) or Lock (col 6) column when header is clicked"""
+        if column not in [5, 6]:  # Only handle Export and Lock columns
+            return
+
+        # Count checked vs unchecked to determine toggle direction
+        checked_count = 0
+        total_count = 0
+
+        for row in range(table.rowCount()):
+            if table.isRowHidden(row):
+                continue
+            widget = table.cellWidget(row, column)
+            if widget:
+                cb = widget.findChild(QCheckBox)
+                if cb:
+                    total_count += 1
+                    if cb.isChecked():
+                        checked_count += 1
+
+        # If more than half are checked, uncheck all; otherwise check all
+        new_state = checked_count < (total_count / 2)
+
+        # Toggle all checkboxes in this column
+        for row in range(table.rowCount()):
+            if table.isRowHidden(row):
+                continue
+            widget = table.cellWidget(row, column)
+            if widget:
+                cb = widget.findChild(QCheckBox)
+                if cb:
+                    cb.setChecked(new_state)
 
     def add_substitution_row(self, team_name):
         """Add a new row to the substitution table when + button is clicked"""

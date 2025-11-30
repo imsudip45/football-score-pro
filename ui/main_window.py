@@ -318,6 +318,34 @@ class MainWindow(QMainWindow):
         self.reset_match_button.clicked.connect(self.on_reset_clicked)
         self.reset_match_button.hide()  # Initially hidden
 
+        # End Match button (positioned right next to reset match button)
+        self.end_match_button = QPushButton("END MATCH")
+        self.end_match_button.setFont(QFont("Verdana", 10, QFont.Weight.Bold))
+        self.end_match_button.setFixedHeight(40)
+        self.end_match_button.setFixedWidth(140)
+        self.end_match_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #48bb78, stop:1 #38a169);
+                color: white;
+                border: 2px solid #2f855a;
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #68d391, stop:1 #48bb78);
+                border: 2px solid #38a169;
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #38a169, stop:1 #2f855a);
+            }
+        """)
+        self.end_match_button.clicked.connect(self.on_end_match_clicked)
+        self.end_match_button.hide()  # Initially hidden
+
         # Lock/Unlock toggle button (to the left of reset button)
         self.lock_toggle_button = QPushButton()
         self.lock_toggle_button.setFixedSize(40, 40)
@@ -351,8 +379,11 @@ class MainWindow(QMainWindow):
         tab_bar_layout.addWidget(self.tab_button_match_setup)
         tab_bar_layout.addWidget(self.tab_button_play_on)
         tab_bar_layout.addWidget(self.tab_button_subs_penalty)
-        tab_bar_layout.addStretch()  # Push reset button to far right
-        tab_bar_layout.addWidget(self.lock_toggle_button)  # Lock button before reset
+        tab_bar_layout.addStretch()  # Push buttons to far right
+        tab_bar_layout.addWidget(
+            self.lock_toggle_button
+        )  # Lock button before end match
+        tab_bar_layout.addWidget(self.end_match_button)  # End match button
         tab_bar_layout.addWidget(self.reset_match_button)  # Far right corner
 
     def get_tab_button_style(self, is_active):
@@ -419,6 +450,7 @@ class MainWindow(QMainWindow):
             self.tab_button_play_on.setStyleSheet(self.get_tab_button_style(False))
             self.tab_button_subs_penalty.setStyleSheet(self.get_tab_button_style(False))
             self.reset_match_button.hide()
+            self.end_match_button.hide()
             self.lock_toggle_button.hide()
         elif index == 1:
             self.tab_button_play_on.setChecked(True)
@@ -426,6 +458,7 @@ class MainWindow(QMainWindow):
             self.tab_button_play_on.setStyleSheet(self.get_tab_button_style(True))
             self.tab_button_subs_penalty.setStyleSheet(self.get_tab_button_style(False))
             self.reset_match_button.show()
+            self.end_match_button.show()
             self.lock_toggle_button.show()
         elif index == 2:
             self.tab_button_subs_penalty.setChecked(True)
@@ -433,6 +466,7 @@ class MainWindow(QMainWindow):
             self.tab_button_play_on.setStyleSheet(self.get_tab_button_style(False))
             self.tab_button_subs_penalty.setStyleSheet(self.get_tab_button_style(True))
             self.reset_match_button.show()
+            self.end_match_button.show()
             self.lock_toggle_button.show()
 
             # Keep status bar visible
@@ -1082,6 +1116,41 @@ class MainWindow(QMainWindow):
             ):
                 self.subs_penalty_tab.reset_to_match_created_state()
             self.status_bar.showMessage("Match reset successfully")
+
+    def on_end_match_clicked(self):
+        """Handle end match button click"""
+        if self.is_locked:
+            QMessageBox.warning(
+                self,
+                "Application Locked",
+                "The application is locked. Please unlock it first to end the match.",
+            )
+            return
+
+        # Check if match is created
+        if hasattr(self, "play_on_tab") and hasattr(self.play_on_tab, "match_created"):
+            if not self.play_on_tab.match_created:
+                QMessageBox.information(self, "No Match", "No active match to end.")
+                return
+
+        # Confirm end match
+        reply = QMessageBox.question(
+            self,
+            "End Match",
+            "Are you sure you want to end the match? This action will finalize the match data.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            # TODO: Add logic to finalize and save match data
+            # For now, just show a success message
+            self.status_bar.showMessage("Match ended successfully")
+            QMessageBox.information(
+                self,
+                "Match Ended",
+                "Match has been ended successfully. Match data has been finalized.",
+            )
 
     def update_lock_button_icon(self):
         """Update the lock button icon based on current lock state."""

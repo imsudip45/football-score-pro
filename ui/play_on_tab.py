@@ -1,7 +1,7 @@
 import copy
 
-from PySide6.QtCore import Property, QObject, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtCore import Property, QObject, QRegularExpression, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QFont, QPainter, QPen, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QRadioButton,
+    QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -58,6 +59,56 @@ TIME_EDITOR_STYLE = """
         background-color: #1f2937;
     }
 """
+
+
+# Shared TimeColumnDelegate for time column editing in scorer and cards tables
+class TimeColumnDelegate(QStyledItemDelegate):
+    """Delegate for time column editing with validation and auto-formatting"""
+
+    def createEditor(self, parent, option, index):
+        editor = super().createEditor(parent, option, index)
+        if editor:
+            editor.setFont(QFont("Verdana", 12))
+            editor.setStyleSheet(TIME_EDITOR_STYLE)
+            # Add validator to only allow numbers and colon (for time format)
+            regex = QRegularExpression(r"^[0-9:]{0,6}$")
+            validator = QRegularExpressionValidator(regex, editor)
+            editor.setValidator(validator)
+            editor.setMaxLength(6)
+        return editor
+
+    def setModelData(self, editor, model, index):
+        """Format the input to MM:SS or MMM:SS format when 3, 4, or 5 digits are entered"""
+        text = editor.text().strip()
+
+        # Remove any existing colons to get just digits
+        digits_only = text.replace(":", "")
+
+        # Format based on number of digits
+        if len(digits_only) == 3:
+            minutes = digits_only[0].zfill(2)
+            seconds = digits_only[1:3].zfill(2)
+            formatted_text = f"{minutes}:{seconds}"
+        elif len(digits_only) == 4:
+            minutes = digits_only[0:2]
+            seconds = digits_only[2:4]
+            formatted_text = f"{minutes}:{seconds}"
+        elif len(digits_only) == 5:
+            minutes = digits_only[0:3]
+            seconds = digits_only[3:5]
+            formatted_text = f"{minutes}:{seconds}"
+        elif ":" in text:
+            parts = text.split(":")
+            if len(parts) == 2:
+                minutes = parts[0]
+                seconds = parts[1].zfill(2)
+                formatted_text = f"{minutes}:{seconds}"
+            else:
+                formatted_text = text
+        else:
+            formatted_text = text
+
+        model.setData(index, formatted_text, Qt.ItemDataRole.EditRole)
 
 
 class WhiteCheckmarkCheckBox(QCheckBox):
@@ -397,10 +448,7 @@ class CustomSpinBox(QWidget):
             buttons_layout.addWidget(self.up_button)
             buttons_layout.addWidget(self.down_button)
 
-        if self.buttons_on_right and self.show_buttons:
-            main_layout.addWidget(self.input_field)
-            main_layout.addLayout(buttons_layout)
-        elif self.show_buttons:
+        if self.show_buttons:
             main_layout.addWidget(self.input_field)
             main_layout.addLayout(buttons_layout)
         else:
@@ -590,68 +638,11 @@ class ScorerPanel(QWidget):
         self.scorer_table.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
+        # Disable selection highlighting
+        self.scorer_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.scorer_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         # Set custom delegate for time column to maintain font size during editing
-        from PySide6.QtCore import QRegularExpression
-        from PySide6.QtGui import QRegularExpressionValidator
-        from PySide6.QtWidgets import QStyledItemDelegate
-
-        class TimeColumnDelegate(QStyledItemDelegate):
-            def createEditor(self, parent, option, index):
-                editor = super().createEditor(parent, option, index)
-                if editor:
-                    editor.setFont(QFont("Verdana", 12))
-                    # Use shared styling for time editors
-                    editor.setStyleSheet(TIME_EDITOR_STYLE)
-                    # Add validator to only allow numbers and colon (for time format)
-                    # Pattern allows: digits and colon, max 6 chars (e.g., "104:56" or "90:00")
-                    # This allows up to 5 digits plus colon symbol, no alphabets
-                    regex = QRegularExpression(r"^[0-9:]{0,6}$")
-                    validator = QRegularExpressionValidator(regex, editor)
-                    editor.setValidator(validator)
-                    # Also set max length to prevent too long input
-                    editor.setMaxLength(6)
-                return editor
-
-            def setModelData(self, editor, model, index):
-                """Format the input to MM:SS or MMM:SS format when 3, 4, or 5 digits are entered"""
-                text = editor.text().strip()
-
-                # Remove any existing colons to get just digits
-                digits_only = text.replace(":", "")
-
-                # Format based on number of digits
-                if len(digits_only) == 3:
-                    # Format as 0X:XX (e.g., "345" -> "03:45")
-                    minutes = digits_only[0].zfill(2)
-                    seconds = digits_only[1:3].zfill(2)
-                    formatted_text = f"{minutes}:{seconds}"
-                elif len(digits_only) == 4:
-                    # Format as XX:XX (e.g., "2345" -> "23:45")
-                    minutes = digits_only[0:2]
-                    seconds = digits_only[2:4]
-                    formatted_text = f"{minutes}:{seconds}"
-                elif len(digits_only) == 5:
-                    # Format as XXX:XX (e.g., "10456" -> "104:56")
-                    minutes = digits_only[0:3]
-                    seconds = digits_only[3:5]
-                    formatted_text = f"{minutes}:{seconds}"
-                elif ":" in text:
-                    # Already has colon, use as is (but ensure proper format)
-                    parts = text.split(":")
-                    if len(parts) == 2:
-                        minutes = parts[0]
-                        seconds = parts[1].zfill(2)
-                        formatted_text = f"{minutes}:{seconds}"
-                    else:
-                        formatted_text = text
-                else:
-                    # Use text as is if it doesn't match patterns
-                    formatted_text = text
-
-                # Set the formatted text to the model
-                model.setData(index, formatted_text, Qt.ItemDataRole.EditRole)
-
         time_delegate = TimeColumnDelegate()
         self.scorer_table.setItemDelegateForColumn(0, time_delegate)
 
@@ -663,6 +654,11 @@ class ScorerPanel(QWidget):
             item.setForeground(QColor(CONFIG["colors"]["text"]))
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.scorer_table.setHorizontalHeaderItem(col, item)
+
+        # Connect header click to toggle all checkboxes in Export and Lock columns
+        self.scorer_table.horizontalHeader().sectionClicked.connect(
+            lambda col: self._on_scorer_header_clicked(col)
+        )
 
         # Initialize table
         self._initialize_table()
@@ -702,27 +698,21 @@ class ScorerPanel(QWidget):
                 num_text = num_item.text().strip() if num_item else ""
                 if not num_text and (not name_text or name_text == "Select Player"):
                     continue
+                # Get checkboxes once to avoid duplicate calls
+                export_cb = self._get_checkbox_from_cell(
+                    self.scorer_table.cellWidget(row, 3)
+                )
+                lock_cb = self._get_checkbox_from_cell(
+                    self.scorer_table.cellWidget(row, 4)
+                )
+
                 row_data = {
                     "time": time_item.text() if time_item else "00:00",
                     "number": num_text,
                     "name": name_text,
                     "method": name_btn.property("scoring_method"),
-                    "exported": bool(
-                        self._get_checkbox_from_cell(
-                            self.scorer_table.cellWidget(row, 3)
-                        )
-                        and self._get_checkbox_from_cell(
-                            self.scorer_table.cellWidget(row, 3)
-                        ).isChecked()
-                    ),
-                    "locked": bool(
-                        self._get_checkbox_from_cell(
-                            self.scorer_table.cellWidget(row, 4)
-                        )
-                        and self._get_checkbox_from_cell(
-                            self.scorer_table.cellWidget(row, 4)
-                        ).isChecked()
-                    ),
+                    "exported": bool(export_cb and export_cb.isChecked()),
+                    "locked": bool(lock_cb and lock_cb.isChecked()),
                     "visible": not self.scorer_table.isRowHidden(row),
                 }
                 rows.append(row_data)
@@ -1172,6 +1162,34 @@ class ScorerPanel(QWidget):
                     tooltip = "Red card — player is no longer available."
                     name_item.setToolTip(tooltip)
                     jersey_item.setToolTip(tooltip)
+                else:
+                    # Check if player has yellow card
+                    yellow_card_set = set()
+                    try:
+                        if hasattr(self.parent_tab, "yellow_card_players"):
+                            normalized_team = (
+                                "home"
+                                if str(team_type).lower().startswith("home")
+                                else "away"
+                            )
+                            yellow_card_set = self.parent_tab.yellow_card_players.get(
+                                normalized_team, set()
+                            )
+                    except Exception:
+                        yellow_card_set = set()
+
+                    if str(jersey_num) in yellow_card_set:
+                        # Yellow highlight for players with yellow cards
+                        color = QColor("#fbbf24")  # Yellow/amber color
+                        name_item.setForeground(color)
+                        jersey_item.setForeground(color)
+                        name_item.setBackground(
+                            QColor("#78350f")
+                        )  # Dark amber background
+                        jersey_item.setBackground(QColor("#78350f"))
+                        tooltip = "Yellow card — player is on a caution."
+                        name_item.setToolTip(tooltip)
+                        jersey_item.setToolTip(tooltip)
 
                 # Scoring method checkboxes with white checkmark
                 foot_cb = WhiteCheckmarkCheckBox()
@@ -1477,6 +1495,39 @@ class ScorerPanel(QWidget):
         except Exception as e:
             print(f"Error setting selected player: {e}")
 
+    def _on_scorer_header_clicked(self, column):
+        """Toggle all checkboxes in Export (col 3) or Lock (col 4) column when header is clicked"""
+        if column not in [3, 4]:  # Only handle Export and Lock columns
+            return
+
+        # Count checked vs unchecked to determine toggle direction
+        checked_count = 0
+        total_count = 0
+
+        for row in range(self.scorer_table.rowCount()):
+            if self.scorer_table.isRowHidden(row):
+                continue
+            widget = self.scorer_table.cellWidget(row, column)
+            if widget:
+                cb = widget.findChild(QCheckBox)
+                if cb:
+                    total_count += 1
+                    if cb.isChecked():
+                        checked_count += 1
+
+        # If more than half are checked, uncheck all; otherwise check all
+        new_state = checked_count < (total_count / 2)
+
+        # Toggle all checkboxes in this column
+        for row in range(self.scorer_table.rowCount()):
+            if self.scorer_table.isRowHidden(row):
+                continue
+            widget = self.scorer_table.cellWidget(row, column)
+            if widget:
+                cb = widget.findChild(QCheckBox)
+                if cb:
+                    cb.setChecked(new_state)
+
     def deploy_selected_scorers(self):
         """Deploy all selected scorer rows"""
         selected_rows = []
@@ -1722,6 +1773,10 @@ class PlayOnTab(QWidget):
         self.cards_sent_off_players = {"home": set(), "away": set()}
         # Track card-driven sent-off officials separately so we can detect removals
         self.cards_sent_off_officials = {"home": set(), "away": set()}
+        # Track players with yellow cards for visual highlighting
+        self.yellow_card_players = {"home": set(), "away": set()}
+        # Track officials with yellow cards
+        self.yellow_card_officials = {"home": set(), "away": set()}
 
         # Possession tracking variables (from Play_On.py)
         self.home_ball_control_time = 0  # Seconds
@@ -1761,9 +1816,10 @@ class PlayOnTab(QWidget):
         # Tournament label (positioned above timer)
         self.tournament_label = QLabel("Tournament Name", self)
         self.tournament_label.setFont(QFont("Verdana", 10, QFont.Weight.Normal))
-        self.tournament_label.setStyleSheet("""
+        self.tournament_label.setStyleSheet(f"""
             QLabel {{
                 background-color: transparent;
+                color: {CONFIG["colors"]["text"]};
                 border: none;
             }}
         """)
@@ -3252,6 +3308,9 @@ class PlayOnTab(QWidget):
             QTableWidget.EditTrigger.DoubleClicked
             | QTableWidget.EditTrigger.EditKeyPressed
         )
+        # Disable selection highlighting
+        self.home_card_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.home_card_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         # Set custom header labels for Home Card Table (with Select)
         card_header_labels = [
@@ -3278,6 +3337,10 @@ class PlayOnTab(QWidget):
         home_header = self.home_card_table.horizontalHeader()
         home_header.setSectionResizeMode(QHeaderView.Fixed)
         home_header.setStretchLastSection(False)
+        # Connect header click to toggle Export and Lock columns
+        home_header.sectionClicked.connect(
+            lambda col: self.on_card_header_clicked(self.home_card_table, col)
+        )
 
         # Home Card Table starts empty - rows will be added via + button
 
@@ -3464,75 +3527,22 @@ class PlayOnTab(QWidget):
         header = self.away_card_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Fixed)
         header.setStretchLastSection(False)
+        # Connect header click to toggle Export and Lock columns
+        header.sectionClicked.connect(
+            lambda col: self.on_card_header_clicked(self.away_card_table, col)
+        )
         self.away_card_table.verticalHeader().setVisible(False)
         self.away_card_table.setEditTriggers(
             QTableWidget.EditTrigger.DoubleClicked
             | QTableWidget.EditTrigger.EditKeyPressed
         )
+        # Disable selection highlighting
+        self.away_card_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.away_card_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         # Away Card Table starts empty - rows will be added via + button
 
         # Add custom delegate for time column in both cards tables
-        from PySide6.QtCore import QRegularExpression
-        from PySide6.QtGui import QRegularExpressionValidator
-        from PySide6.QtWidgets import QStyledItemDelegate
-
-        class TimeColumnDelegate(QStyledItemDelegate):
-            def createEditor(self, parent, option, index):
-                editor = super().createEditor(parent, option, index)
-                if editor:
-                    editor.setFont(QFont("Verdana", 12))
-                    # Use shared styling for time editors
-                    editor.setStyleSheet(TIME_EDITOR_STYLE)
-                    # Add validator to only allow numbers and colon (for time format)
-                    # Pattern allows: digits and colon, max 6 chars (e.g., "104:56" or "90:00")
-                    # This allows up to 5 digits plus colon symbol, no alphabets
-                    regex = QRegularExpression(r"^[0-9:]{0,6}$")
-                    validator = QRegularExpressionValidator(regex, editor)
-                    editor.setValidator(validator)
-                    # Also set max length to prevent too long input
-                    editor.setMaxLength(6)
-                return editor
-
-            def setModelData(self, editor, model, index):
-                """Format the input to MM:SS or MMM:SS format when 3, 4, or 5 digits are entered"""
-                text = editor.text().strip()
-
-                # Remove any existing colons to get just digits
-                digits_only = text.replace(":", "")
-
-                # Format based on number of digits
-                if len(digits_only) == 3:
-                    # Format as 0X:XX (e.g., "345" -> "03:45")
-                    minutes = digits_only[0].zfill(2)
-                    seconds = digits_only[1:3].zfill(2)
-                    formatted_text = f"{minutes}:{seconds}"
-                elif len(digits_only) == 4:
-                    # Format as XX:XX (e.g., "2345" -> "23:45")
-                    minutes = digits_only[0:2]
-                    seconds = digits_only[2:4]
-                    formatted_text = f"{minutes}:{seconds}"
-                elif len(digits_only) == 5:
-                    # Format as XXX:XX (e.g., "10456" -> "104:56")
-                    minutes = digits_only[0:3]
-                    seconds = digits_only[3:5]
-                    formatted_text = f"{minutes}:{seconds}"
-                elif ":" in text:
-                    # Already has colon, use as is (but ensure proper format)
-                    parts = text.split(":")
-                    if len(parts) == 2:
-                        minutes = parts[0]
-                        seconds = parts[1].zfill(2)
-                        formatted_text = f"{minutes}:{seconds}"
-                    else:
-                        formatted_text = text
-                else:
-                    # Use text as is if it doesn't match patterns
-                    formatted_text = text
-
-                # Set the formatted text to the model
-                model.setData(index, formatted_text, Qt.ItemDataRole.EditRole)
-
         time_delegate = TimeColumnDelegate()
         self.home_card_table.setItemDelegateForColumn(0, time_delegate)
         self.away_card_table.setItemDelegateForColumn(0, time_delegate)
@@ -4419,18 +4429,43 @@ class PlayOnTab(QWidget):
                     )
                     return
 
+            # Get player info before resetting for tracking removal
+            num_item = table.item(row, 1)
+            name_btn = table.cellWidget(row, 2)
+            jersey_number = num_item.text().strip() if num_item else ""
+            player_name = name_btn.text() if name_btn else ""
+
+            # Determine team type
+            team_type = None
+            if table == self.home_card_table:
+                team_type = "home"
+            elif table == self.away_card_table:
+                team_type = "away"
+
+            # Check if player had yellow or red card before resetting
+            had_yellow = False
+            had_red = False
+            yellow_widget = table.cellWidget(row, 3)
+            red_widget = table.cellWidget(row, 4)
+            if yellow_widget:
+                yellow_cb = yellow_widget.findChild(QCheckBox)
+                if yellow_cb and yellow_cb.isChecked():
+                    had_yellow = True
+            if red_widget:
+                red_cb = red_widget.findChild(QCheckBox)
+                if red_cb and red_cb.isChecked():
+                    had_red = True
+
             # Preserve time - don't reset it
             # Reset other data
-            num_item = table.item(row, 1)
             if num_item:
                 num_item.setText("")
 
             # Reset name button
-            name_btn = table.cellWidget(row, 2)
             if name_btn:
                 name_btn.setText("Select Player")
 
-                # Reset checkboxes (Yellow, Red, Lock)
+            # Reset checkboxes (Yellow, Red, Lock)
             for col in [3, 4, 6]:  # Yellow, Red, Lock
                 widget = table.cellWidget(row, col)
                 if widget:
@@ -4440,6 +4475,20 @@ class PlayOnTab(QWidget):
                         # Enable yellow/red checkboxes, disable lock checkbox
                         cb.setEnabled(True if col in [3, 4] else False)
 
+            # Remove player from yellow/red card tracking
+            if team_type:
+                if had_yellow:
+                    if jersey_number:
+                        self.yellow_card_players[team_type].discard(jersey_number)
+                    else:
+                        self.yellow_card_officials[team_type].discard(player_name)
+
+                if had_red:
+                    if jersey_number:
+                        self.sent_off_players[team_type].discard(jersey_number)
+                    else:
+                        self.sent_off_officials[team_type].discard(player_name)
+
             # Hide all rows below this one instead of deleting them
             total_rows = table.rowCount()
             for r in range(row + 1, total_rows):
@@ -4448,19 +4497,12 @@ class PlayOnTab(QWidget):
             print(
                 f"Reset card row {row} to default (preserved time, hidden rows below)"
             )
-            # After resetting a row, recompute card totals and fouls
-            try:
-                team = None
-                if table == self.home_cards_table:
-                    team = "home"
-                elif table == self.away_cards_table:
-                    team = "away"
-
-                if team:
-                    self.update_card_totals(team)
-                    self.update_fouls_display(team)
-            except Exception as e:
-                print(f"Error updating card totals after reset: {e}")
+            # After resetting a row, recompute card stats
+            if team_type:
+                try:
+                    self.update_card_stats(team_type)
+                except Exception as e:
+                    print(f"Error updating card stats after reset: {e}")
 
         except Exception:
             print("Error resetting card row")
@@ -4585,7 +4627,7 @@ class PlayOnTab(QWidget):
 
         # Position RESET ET safely inside the panel (avoid clipping on the right)
         self.btn_reset_timer = ModernButton(
-            "RESET ET", "danger", extra_timer_panel, font_size=12.5
+            "RESET ET", "danger", extra_timer_panel, font_size=12
         )
         self.btn_reset_timer.setGeometry(438, 59, 120, 40)
 
@@ -4757,7 +4799,7 @@ class PlayOnTab(QWidget):
         # Nudge deploy button away from rounded border
         self.stats_deploy_button.setGeometry(470, 15, 90, 30)
         self.stats_deploy_button.setStyleSheet("""
-            QPushButton {{
+            QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 #38a169, stop:1 #2f855a);
                 color: white;
@@ -4766,16 +4808,16 @@ class PlayOnTab(QWidget):
                 padding: 4px 8px;
                 font-weight: bold;
                 font-size: 14px;
-            }}
-            QPushButton:hover {{
+            }
+            QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 #48bb78, stop:1 #38a169);
                 border: 2px solid #2f855a;
-            }}
-            QPushButton:pressed {{
+            }
+            QPushButton:pressed {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 #2f855a, stop:1 #276749);
-            }}
+            }
         """)
         self.stats_deploy_button.clicked.connect(self.deploy_all_stats)
         self.stats_deploy_button.show()  # Explicitly show the button
@@ -4901,7 +4943,7 @@ class PlayOnTab(QWidget):
                 animator_home_dec = FontSizeAnimator(home_dec, 16)
                 self.button_animators[home_dec] = animator_home_dec
                 home_dec.clicked.connect(
-                    lambda checked, key=stat_key, team="home": self.safe_decrease_stat(
+                    lambda checked, key=stat_key, team="home": self.decrease_stat(
                         key, team
                     )
                 )
@@ -5041,7 +5083,7 @@ class PlayOnTab(QWidget):
                 animator_away_dec = FontSizeAnimator(away_dec, 16)
                 self.button_animators[away_dec] = animator_away_dec
                 away_dec.clicked.connect(
-                    lambda checked, key=stat_key, team="away": self.safe_decrease_stat(
+                    lambda checked, key=stat_key, team="away": self.decrease_stat(
                         key, team
                     )
                 )
@@ -6200,12 +6242,38 @@ class PlayOnTab(QWidget):
                     f"✅ {team_type.title()} team: Yellow card given to {player_name}"
                 )
 
+                # Track yellow card for highlighting
+                normalized_team = (
+                    "home" if str(team_type).lower().startswith("home") else "away"
+                )
+                if jersey_number:
+                    # Player with jersey number
+                    self.yellow_card_players[normalized_team].add(jersey_number)
+                else:
+                    # Official without jersey number (track by name)
+                    self.yellow_card_officials[normalized_team].add(player_name)
+
                 # Do not auto-create a new row on toggle
                 # Update aggregated card stats and enforce fouls minimum
                 self.update_card_stats(team_type)
 
             else:
                 # Yellow card was removed
+                # Get player info to remove from tracking
+                name_btn = table.cellWidget(row, 2)
+                num_item = table.item(row, 1)
+                player_name = name_btn.text() if name_btn else "Unknown Player"
+                jersey_number = num_item.text().strip() if num_item else ""
+
+                # Remove from yellow card tracking
+                normalized_team = (
+                    "home" if str(team_type).lower().startswith("home") else "away"
+                )
+                if jersey_number:
+                    self.yellow_card_players[normalized_team].discard(jersey_number)
+                else:
+                    self.yellow_card_officials[normalized_team].discard(player_name)
+
                 print(f"Yellow card removed for {team_type} team")
                 # Recompute stats from current table state so fouls and cards decrease correctly
                 self.update_card_stats(team_type)
@@ -6410,6 +6478,39 @@ class PlayOnTab(QWidget):
             return True
         except Exception:
             return False
+
+    def on_card_header_clicked(self, table, column):
+        """Toggle all checkboxes in Export (col 5) or Lock (col 6) column when header is clicked"""
+        if column not in [5, 6]:  # Only handle Export and Lock columns
+            return
+
+        # Count checked vs unchecked to determine toggle direction
+        checked_count = 0
+        total_count = 0
+
+        for row in range(table.rowCount()):
+            if table.isRowHidden(row):
+                continue
+            widget = table.cellWidget(row, column)
+            if widget:
+                cb = widget.findChild(QCheckBox)
+                if cb:
+                    total_count += 1
+                    if cb.isChecked():
+                        checked_count += 1
+
+        # If more than half are checked, uncheck all; otherwise check all
+        new_state = checked_count < (total_count / 2)
+
+        # Toggle all checkboxes in this column
+        for row in range(table.rowCount()):
+            if table.isRowHidden(row):
+                continue
+            widget = table.cellWidget(row, column)
+            if widget:
+                cb = widget.findChild(QCheckBox)
+                if cb:
+                    cb.setChecked(new_state)
 
     def add_card_row(self, table, team_type):
         """Add a new row to the card table when + button is clicked"""
