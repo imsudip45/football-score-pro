@@ -5167,7 +5167,6 @@ class PlayOnTab(QWidget):
             self.extra_time_value_label.setText("+0")
             self.extra_time_value_label.setVisible(False)
 
-
     def update_stat_display(self, stat_key, team):
         """Update the display of a statistic."""
         if stat_key in self.stats_widgets:
@@ -6019,15 +6018,173 @@ class PlayOnTab(QWidget):
         except Exception as e:
             print(f"Error in update_stats_for_card: {e}")
 
+    def check_player_has_card_in_other_row(
+        self, table, current_row, player_name, jersey_number
+    ):
+        """
+        Check if a player already has a card (yellow or red) in any other row.
+        Returns tuple: (has_card, row_number, card_type) where:
+        - has_card: True if player has a card in another row
+        - row_number: The row number where the card exists (or -1 if not found)
+        - card_type: 'yellow' or 'red' (or None if not found)
+        """
+        try:
+            for row in range(table.rowCount()):
+                # Skip the current row and hidden rows
+                if row == current_row or table.isRowHidden(row):
+                    continue
+
+                # Get player info from this row
+                num_item = table.item(row, 1)
+                name_btn = table.cellWidget(row, 2)
+
+                if not num_item or not name_btn:
+                    continue
+
+                row_jersey = num_item.text().strip()
+                row_name = name_btn.text().strip()
+
+                # Check if it's the same player (by jersey number and/or name)
+                is_same_player = False
+                if jersey_number and row_jersey and jersey_number == row_jersey:
+                    is_same_player = True
+                elif (
+                    player_name
+                    and row_name
+                    and player_name != "Select Player"
+                    and row_name != "Select Player"
+                ):
+                    if player_name == row_name:
+                        is_same_player = True
+
+                if is_same_player:
+                    # Check if this row has a yellow or red card
+                    yellow_widget = table.cellWidget(row, 3)
+                    red_widget = table.cellWidget(row, 4)
+
+                    if yellow_widget:
+                        yellow_cb = yellow_widget.findChild(QCheckBox)
+                        if yellow_cb and yellow_cb.isChecked():
+                            return (True, row, "yellow")
+
+                    if red_widget:
+                        red_cb = red_widget.findChild(QCheckBox)
+                        if red_cb and red_cb.isChecked():
+                            return (True, row, "red")
+
+            return (False, -1, None)
+        except Exception as e:
+            print(f"Error in check_player_has_card_in_other_row: {e}")
+            return (False, -1, None)
+
+    def check_player_has_card_in_later_row(
+        self, table, current_row, player_name, jersey_number
+    ):
+        """
+        Check if a player already has a card (yellow or red) in any LATER row (row number > current_row).
+        This prevents changing an earlier card when the player has a card in a newer row.
+        Returns tuple: (has_card, row_number, card_type) where:
+        - has_card: True if player has a card in a later row
+        - row_number: The row number where the card exists (or -1 if not found)
+        - card_type: 'yellow' or 'red' (or None if not found)
+        """
+        try:
+            for row in range(current_row + 1, table.rowCount()):
+                # Skip hidden rows
+                if table.isRowHidden(row):
+                    continue
+
+                # Get player info from this row
+                num_item = table.item(row, 1)
+                name_btn = table.cellWidget(row, 2)
+
+                if not num_item or not name_btn:
+                    continue
+
+                row_jersey = num_item.text().strip()
+                row_name = name_btn.text().strip()
+
+                # Check if it's the same player (by jersey number and/or name)
+                is_same_player = False
+                if jersey_number and row_jersey and jersey_number == row_jersey:
+                    is_same_player = True
+                elif (
+                    player_name
+                    and row_name
+                    and player_name != "Select Player"
+                    and row_name != "Select Player"
+                ):
+                    if player_name == row_name:
+                        is_same_player = True
+
+                if is_same_player:
+                    # Check if this row has a yellow or red card
+                    yellow_widget = table.cellWidget(row, 3)
+                    red_widget = table.cellWidget(row, 4)
+
+                    if yellow_widget:
+                        yellow_cb = yellow_widget.findChild(QCheckBox)
+                        if yellow_cb and yellow_cb.isChecked():
+                            return (True, row, "yellow")
+
+                    if red_widget:
+                        red_cb = red_widget.findChild(QCheckBox)
+                        if red_cb and red_cb.isChecked():
+                            return (True, row, "red")
+
+            return (False, -1, None)
+        except Exception as e:
+            print(f"Error in check_player_has_card_in_later_row: {e}")
+            return (False, -1, None)
+
     def on_yellow_card_changed(self, state, team_type, row, table):
         """Handle yellow card checkbox state change"""
         try:
             from PySide6.QtCore import Qt
 
             if state == Qt.CheckState.Checked.value:
-                # Yellow card was given
+                # Get player info
                 name_btn = table.cellWidget(row, 2)
+                num_item = table.item(row, 1)
                 player_name = name_btn.text() if name_btn else "Unknown Player"
+                jersey_number = num_item.text().strip() if num_item else ""
+
+                # First check: if player has card in a LATER row (newer entry), block this change to earlier row
+                has_later_card, later_row, later_card_type = (
+                    self.check_player_has_card_in_later_row(
+                        table, row, player_name, jersey_number
+                    )
+                )
+
+                if has_later_card:
+                    # Uncheck the yellow checkbox and RE-CHECK red if it was checked before (restore original state)
+                    yellow_widget = table.cellWidget(row, 3)
+                    if yellow_widget:
+                        yellow_cb = yellow_widget.findChild(QCheckBox)
+                        if yellow_cb:
+                            yellow_cb.blockSignals(True)
+                            yellow_cb.setChecked(False)
+                            yellow_cb.blockSignals(False)
+
+                    # Re-check the red card to restore the original state if it was unchecked by mutual exclusion
+                    red_widget = table.cellWidget(row, 4)
+                    if red_widget:
+                        red_cb = red_widget.findChild(QCheckBox)
+                        # Only re-check red if it was previously checked (mutual exclusion would have unchecked it)
+                        # We can't know for sure, but if yellow was just checked and failed, red might have been the original
+                        # For safety, we won't auto-recheck red here since we don't know the original state
+
+                    # Show warning message
+                    later_card_color = (
+                        "Yellow" if later_card_type == "yellow" else "Red"
+                    )
+                    QMessageBox.warning(
+                        self,
+                        "Cannot Change Card",
+                        f"{player_name} (#{jersey_number}) already has a {later_card_color} card in Row {later_row + 1}.\n\n"
+                        f"Please remove that card first before changing this earlier row's card.",
+                    )
+                    return
 
                 print(f"Yellow card given to {player_name} ({team_type} team)")
 
@@ -6062,9 +6219,49 @@ class PlayOnTab(QWidget):
             from PySide6.QtCore import Qt
 
             if state == Qt.CheckState.Checked.value:
-                # Red card was given
+                # Get player info
                 name_btn = table.cellWidget(row, 2)
+                num_item = table.item(row, 1)
                 player_name = name_btn.text() if name_btn else "Unknown Player"
+                jersey_number = num_item.text().strip() if num_item else ""
+
+                # First check: if player has card in a LATER row (newer entry), block this change to earlier row
+                has_later_card, later_row, later_card_type = (
+                    self.check_player_has_card_in_later_row(
+                        table, row, player_name, jersey_number
+                    )
+                )
+
+                if has_later_card:
+                    # Uncheck the red checkbox and RE-CHECK yellow to restore original state
+                    red_widget = table.cellWidget(row, 4)
+                    if red_widget:
+                        red_cb = red_widget.findChild(QCheckBox)
+                        if red_cb:
+                            red_cb.blockSignals(True)
+                            red_cb.setChecked(False)
+                            red_cb.blockSignals(False)
+
+                    # Re-check the yellow card to restore the original state (since it was unchecked by mutual exclusion)
+                    yellow_widget = table.cellWidget(row, 3)
+                    if yellow_widget:
+                        yellow_cb = yellow_widget.findChild(QCheckBox)
+                        if yellow_cb:
+                            yellow_cb.blockSignals(True)
+                            yellow_cb.setChecked(True)
+                            yellow_cb.blockSignals(False)
+
+                    # Show warning message
+                    later_card_color = (
+                        "Yellow" if later_card_type == "yellow" else "Red"
+                    )
+                    QMessageBox.warning(
+                        self,
+                        "Cannot Change Card",
+                        f"{player_name} (#{jersey_number}) already has a {later_card_color} card in Row {later_row + 1}.\n\n"
+                        f"Please remove that card first before changing this earlier row's card to red.",
+                    )
+                    return
 
                 print(f"Red card given to {player_name} ({team_type} team)")
 
@@ -6076,7 +6273,7 @@ class PlayOnTab(QWidget):
                         yellow_cb.setChecked(False)
 
                 # Show confirmation message
-                print(f"✅ {team_type.title()} team: Red card given to {player_name}")
+                print(f" {team_type.title()} team: Red card given to {player_name}")
 
                 # Do not auto-create a new row on toggle
                 # Update aggregated card stats and enforce fouls minimum
