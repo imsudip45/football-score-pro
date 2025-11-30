@@ -2408,6 +2408,25 @@ class SubsAndPenaltyTab(QWidget):
             else self.sent_off_away_players
         )
 
+    def handle_yellow_card_from_play_on(
+        self,
+        team_type: str,
+        jersey_no: str,
+        has_yellow: bool,
+        player_name: str | None = None,
+    ):
+        """Called by Play On tab when a player receives/loses a yellow card."""
+        # For now, this is just a notification mechanism
+        # The highlighting is already handled in the player selection dialogs
+        # which read from play_on_tab.yellow_card_players
+        try:
+            normalized = "home" if str(team_type).lower().startswith("home") else "away"
+            print(
+                f"DEBUG: Yellow card notification for {normalized} team - Player #{jersey_no} ({player_name}), has_yellow={has_yellow}"
+            )
+        except Exception as exc:
+            print(f"Error handling yellow card notification: {exc}")
+
     def handle_sent_off_player_from_play_on(
         self,
         team_type: str,
@@ -2842,6 +2861,33 @@ class SubsAndPenaltyTab(QWidget):
                     highlight_color = QColor("#22c55e")
                     name_item.setForeground(highlight_color)
                     number_item.setForeground(highlight_color)
+                else:
+                    # Check if player has yellow card
+                    yellow_card_set = set()
+                    try:
+                        main_window = self.window()
+                        if main_window and hasattr(main_window, "play_on_tab"):
+                            play_on_tab = main_window.play_on_tab
+                            if hasattr(play_on_tab, "yellow_card_players"):
+                                normalized_team = "home" if is_home else "away"
+                                yellow_card_set = play_on_tab.yellow_card_players.get(
+                                    normalized_team, set()
+                                )
+                    except Exception:
+                        yellow_card_set = set()
+
+                    if jersey_num in yellow_card_set:
+                        # Yellow highlight for players with yellow cards
+                        yellow_color = QColor("#fbbf24")  # Yellow/amber color
+                        name_item.setForeground(yellow_color)
+                        number_item.setForeground(yellow_color)
+                        name_item.setBackground(
+                            QColor("#78350f")
+                        )  # Dark amber background
+                        number_item.setBackground(QColor("#78350f"))
+                        tooltip = "Yellow card — player is on a caution."
+                        name_item.setToolTip(tooltip)
+                        number_item.setToolTip(tooltip)
 
                 player_table.setItem(row_idx, 0, name_item)
                 player_table.setItem(row_idx, 1, number_item)

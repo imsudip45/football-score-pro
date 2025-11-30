@@ -1578,6 +1578,50 @@ class ScorerPanel(QWidget):
         """Handle Deploy button clicks (legacy method - kept for compatibility)"""
         print(f"Deploy button clicked for scorer row {row}")
 
+    def refresh_yellow_card_highlighting(self):
+        """Refresh yellow card highlighting for all existing rows in the scorer table"""
+        try:
+            team_type = "home" if "HOME" in self.title else "away"
+            yellow_card_set = self.parent_tab.yellow_card_players.get(team_type, set())
+
+            print(
+                f"DEBUG refresh_yellow_card_highlighting: {team_type} team, yellow_card_set = {yellow_card_set}"
+            )
+
+            for row in range(self.scorer_table.rowCount()):
+                if self.scorer_table.isRowHidden(row):
+                    continue
+
+                # Get jersey number from the row
+                num_item = self.scorer_table.item(row, 1)
+                if not num_item:
+                    continue
+
+                jersey_num = num_item.text().strip()
+                if not jersey_num:
+                    continue
+
+                # Apply or remove yellow card highlighting
+                if jersey_num in yellow_card_set:
+                    # Apply yellow highlight
+                    print(
+                        f"DEBUG: Applying yellow highlight to scorer row {row}, player #{jersey_num}"
+                    )
+                    color = QColor("#fbbf24")  # Yellow/amber color
+                    num_item.setForeground(color)
+                    num_item.setBackground(QColor("#78350f"))  # Dark amber background
+                    num_item.setToolTip("Yellow card — player is on a caution.")
+                else:
+                    # Remove yellow highlight (restore default)
+                    print(
+                        f"DEBUG: Removing yellow highlight from scorer row {row}, player #{jersey_num}"
+                    )
+                    num_item.setForeground(QColor("#B0B4BB"))  # Default text color
+                    num_item.setBackground(QColor("transparent"))
+                    num_item.setToolTip("")
+        except Exception as e:
+            print(f"Error refreshing yellow card highlighting: {e}")
+
     def toggle_row_lock(self, row, state):
         """Enable or disable a row based on Lock checkbox state"""
         try:
@@ -2920,6 +2964,11 @@ class PlayOnTab(QWidget):
         mins, secs = divmod(self.seconds, 60)
         display_text = f"{mins:02d}:{secs:02d}"
         self.timer_label.setText(display_text)
+
+    def get_current_time(self):
+        """Get the current match time as a formatted string."""
+        mins, secs = divmod(self.seconds, 60)
+        return f"{mins:02d}:{secs:02d}"
 
     # --- Possession time editing helpers ---
     def _configure_possession_line_edit(self, line_edit, team: str):
@@ -4479,14 +4528,29 @@ class PlayOnTab(QWidget):
             if team_type:
                 if had_yellow:
                     if jersey_number:
+                        print(
+                            f"DEBUG: Removing yellow card for {team_type} team player #{jersey_number}"
+                        )
                         self.yellow_card_players[team_type].discard(jersey_number)
+                        print(
+                            f"DEBUG: Yellow card players after removal: {self.yellow_card_players[team_type]}"
+                        )
                     else:
+                        print(
+                            f"DEBUG: Removing yellow card for {team_type} team official {player_name}"
+                        )
                         self.yellow_card_officials[team_type].discard(player_name)
 
                 if had_red:
                     if jersey_number:
+                        print(
+                            f"DEBUG: Removing red card for {team_type} team player #{jersey_number}"
+                        )
                         self.sent_off_players[team_type].discard(jersey_number)
                     else:
+                        print(
+                            f"DEBUG: Removing red card for {team_type} team official {player_name}"
+                        )
                         self.sent_off_officials[team_type].discard(player_name)
 
             # Hide all rows below this one instead of deleting them
@@ -4503,6 +4567,25 @@ class PlayOnTab(QWidget):
                     self.update_card_stats(team_type)
                 except Exception as e:
                     print(f"Error updating card stats after reset: {e}")
+
+            # Refresh yellow card highlighting in scorer panels after reset
+            if hasattr(self, "home_scorer_panel"):
+                self.home_scorer_panel.refresh_yellow_card_highlighting()
+            if hasattr(self, "away_scorer_panel"):
+                self.away_scorer_panel.refresh_yellow_card_highlighting()
+
+            # Notify substitution panel about the card removal
+            if team_type and (had_yellow or had_red):
+                try:
+                    subs_tab = self.parent().parent().subs_penalty_tab
+                    if had_yellow and hasattr(
+                        subs_tab, "handle_yellow_card_from_play_on"
+                    ):
+                        subs_tab.handle_yellow_card_from_play_on(
+                            team_type, jersey_number, False, player_name
+                        )
+                except Exception as e:
+                    print(f"Could not notify subs panel about card reset: {e}")
 
         except Exception:
             print("Error resetting card row")
@@ -5465,6 +5548,20 @@ class PlayOnTab(QWidget):
             except Exception:
                 pass
 
+            # Reset cards tables
+            try:
+                if hasattr(self, "home_card_table"):
+                    self.home_card_table.setRowCount(0)
+                if hasattr(self, "away_card_table"):
+                    self.away_card_table.setRowCount(0)
+                # Clear yellow and red card tracking
+                self.yellow_card_players = {"home": set(), "away": set()}
+                self.yellow_card_officials = {"home": set(), "away": set()}
+                self.sent_off_players = {"home": set(), "away": set()}
+                self.sent_off_officials = {"home": set(), "away": set()}
+            except Exception as e:
+                print(f"Error resetting cards tables: {e}")
+
             # Reset header highlights
             try:
                 if hasattr(self, "stats_home_header_label") and hasattr(
@@ -6257,6 +6354,22 @@ class PlayOnTab(QWidget):
                 # Update aggregated card stats and enforce fouls minimum
                 self.update_card_stats(team_type)
 
+                # Refresh yellow card highlighting in scorer panels
+                if hasattr(self, "home_scorer_panel"):
+                    self.home_scorer_panel.refresh_yellow_card_highlighting()
+                if hasattr(self, "away_scorer_panel"):
+                    self.away_scorer_panel.refresh_yellow_card_highlighting()
+
+                # Notify substitution panel about yellow card
+                try:
+                    subs_tab = self.parent().parent().subs_penalty_tab
+                    if hasattr(subs_tab, "handle_yellow_card_from_play_on"):
+                        subs_tab.handle_yellow_card_from_play_on(
+                            team_type, jersey_number, True, player_name
+                        )
+                except Exception as e:
+                    print(f"Could not notify subs panel about yellow card: {e}")
+
             else:
                 # Yellow card was removed
                 # Get player info to remove from tracking
@@ -6277,6 +6390,22 @@ class PlayOnTab(QWidget):
                 print(f"Yellow card removed for {team_type} team")
                 # Recompute stats from current table state so fouls and cards decrease correctly
                 self.update_card_stats(team_type)
+
+                # Refresh yellow card highlighting in scorer panels
+                if hasattr(self, "home_scorer_panel"):
+                    self.home_scorer_panel.refresh_yellow_card_highlighting()
+                if hasattr(self, "away_scorer_panel"):
+                    self.away_scorer_panel.refresh_yellow_card_highlighting()
+
+                # Notify substitution panel about yellow card removal
+                try:
+                    subs_tab = self.parent().parent().subs_penalty_tab
+                    if hasattr(subs_tab, "handle_yellow_card_from_play_on"):
+                        subs_tab.handle_yellow_card_from_play_on(
+                            team_type, jersey_number, False, player_name
+                        )
+                except Exception as e:
+                    print(f"Could not notify subs panel about yellow card removal: {e}")
 
         except Exception as e:
             print(f"Error in on_yellow_card_changed: {e}")

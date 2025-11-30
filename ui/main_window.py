@@ -651,7 +651,7 @@ class MainWindow(QMainWindow):
                 current_widget.adjustSize()
                 # Only call update_layout if it exists and has guards
                 if hasattr(current_widget, "update_layout"):
-                    current_widget.update_layout()
+                    current_widget.update_layout()  # type: ignore[attr-defined]
         except Exception as e:
             print(f"Error in _force_layout_update: {e}")
         finally:
@@ -682,7 +682,7 @@ class MainWindow(QMainWindow):
                 current_widget.updateGeometry()
                 current_widget.adjustSize()
                 if hasattr(current_widget, "update_layout"):
-                    current_widget.update_layout()
+                    current_widget.update_layout()  # type: ignore[attr-defined]
         except Exception as e:
             print(f"Error in _delayed_tab_layout_update: {e}")
 
@@ -696,7 +696,7 @@ class MainWindow(QMainWindow):
                 current_widget.adjustSize()
                 # Force layout recalculation for the widget
                 if hasattr(current_widget, "update_layout"):
-                    current_widget.update_layout()
+                    current_widget.update_layout()  # type: ignore[attr-defined]
         except Exception as e:
             print(f"Error in _update_all_tab_layouts: {e}")
 
@@ -1131,6 +1131,16 @@ class MainWindow(QMainWindow):
         if hasattr(self, "play_on_tab") and hasattr(self.play_on_tab, "match_created"):
             if not self.play_on_tab.match_created:
                 QMessageBox.information(self, "No Match", "No active match to end.")
+                return
+
+        # Check if timer has been stopped
+        if hasattr(self, "play_on_tab") and hasattr(self.play_on_tab, "timer_running"):
+            if self.play_on_tab.timer_running:
+                QMessageBox.warning(
+                    self,
+                    "Timer Still Running",
+                    "Please stop the match timer before ending the match.",
+                )
                 return
 
         # Confirm end match
