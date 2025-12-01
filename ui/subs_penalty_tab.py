@@ -4021,76 +4021,80 @@ class SubsAndPenaltyTab(QWidget):
         3) Parent with integer seconds attribute -> format mm:ss
         Falls back to "00:00".
         """
-        try:
-            # Walk up the parent chain to find PlayOnTab-like object
-            obj = self.parent()
-            visited = 0
-            while obj is not None and visited < 6:
-                # Method preferred
-                if hasattr(obj, "get_current_time_text") and callable(
-                    getattr(obj, "get_current_time_text")
-                ):
-                    t = obj.get_current_time_text()
-                    return t or "00:00"
-                # Label fallback
-                if hasattr(obj, "timer_label"):
-                    try:
-                        t = obj.timer_label.text()
-                        return t or "00:00"
-                    except Exception:
-                        pass
-                # Seconds fallback
-                if hasattr(obj, "seconds"):
-                    try:
-                        total = int(obj.seconds)
-                        mins, secs = divmod(total, 60)
-                        t = f"{mins:02d}:{secs:02d}"
-                        return t
-                    except Exception:
-                        pass
-                obj = obj.parent() if hasattr(obj, "parent") else None
-                visited += 1
 
-            # If not found in parents, search the window tree once and cache provider
+        # Helper to extract time from an object
+        def _extract_time(obj):
+            # Try method first
+            method = getattr(obj, "get_current_time_text", None)
+            if callable(method):
+                result = method()
+                if result:
+                    return result
+
+            # Try timer_label
+            timer_label = getattr(obj, "timer_label", None)
+            if timer_label:
+                try:
+                    result = timer_label.text()
+                    if result:
+                        return result
+                except (AttributeError, RuntimeError):
+                    pass
+
+            # Try seconds attribute
+            seconds = getattr(obj, "seconds", None)
+            if seconds is not None:
+                try:
+                    total = int(seconds)
+                    mins, secs = divmod(total, 60)
+                    return f"{mins:02d}:{secs:02d}"
+                except (ValueError, TypeError):
+                    pass
+
+            return None
+
+        # Walk up parent chain (limit 6 levels)
+        obj = self.parent()
+        for _ in range(6):
+            if obj is None:
+                break
+
+            result = _extract_time(obj)
+            if result:
+                return result
+
+            obj = obj.parent() if hasattr(obj, "parent") else None
+
+        # Check cached provider (only if valid)
+        provider = getattr(self, "_time_provider", None)
+        if provider is not None:
             try:
-                win = self.window()
-                provider = getattr(self, "_time_provider", None)
-                if provider is None and win is not None:
-                    from PySide6.QtCore import QObject
+                # Validate provider still exists (Qt objects can be deleted)
+                _ = provider.parent()
+                result = _extract_time(provider)
+                if result:
+                    return result
+            except RuntimeError:
+                # Provider was deleted, clear cache
+                self._time_provider = None
 
-                    for child in win.findChildren(QObject):
-                        if (
-                            hasattr(child, "get_current_time_text")
-                            or hasattr(child, "timer_label")
-                            or hasattr(child, "seconds")
-                        ):
-                            provider = child
-                            self._time_provider = provider
-                            break
-                if provider is not None:
-                    if hasattr(provider, "get_current_time_text") and callable(
-                        getattr(provider, "get_current_time_text")
-                    ):
-                        t = provider.get_current_time_text()
-                        return t or "00:00"
-                    if hasattr(provider, "timer_label"):
-                        try:
-                            t = provider.timer_label.text()
-                            return t or "00:00"
-                        except Exception:
-                            pass
-                    if hasattr(provider, "seconds"):
-                        try:
-                            total = int(provider.seconds)
-                            mins, secs = divmod(total, 60)
-                            t = f"{mins:02d}:{secs:02d}"
-                            return t
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-        except Exception:
+        # Search window tree for provider (only specific types, cache result)
+        try:
+            win = self.window()
+            if win is not None:
+                # Only search PlayOnTab instances (much faster than all QObjects)
+                from ui.play_on_tab import PlayOnTab
+
+                play_on_tabs = win.findChildren(PlayOnTab)
+                if play_on_tabs:
+                    provider = play_on_tabs[0]
+                    self._time_provider = provider
+                    result = _extract_time(provider)
+                    if result:
+                        return result
+        except (AttributeError, RuntimeError, ImportError):
             pass
+
         return "00:00"
 
     def deploy_substitutions(self, team_name):

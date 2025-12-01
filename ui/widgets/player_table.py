@@ -54,8 +54,8 @@ class PlayerTable(QTableWidget):
 
         # Match old app column widths exactly
         self.setColumnWidth(0, 60)  # Num - was 80
-        self.setColumnWidth(1, 150)  # Name (initial width, will stretch) - was 300
-        self.setColumnWidth(2, 100)  # ID - was 120
+        self.setColumnWidth(1, 130)  # Name (initial width, will stretch) - was 300
+        self.setColumnWidth(2, 180)  # ID - was 120
         self.setColumnWidth(3, 100)  # Position - was 80
         self.setColumnWidth(4, 100)  # Select - was 60
 

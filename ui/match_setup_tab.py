@@ -61,6 +61,9 @@ class MatchSetupTab(QWidget):
         self.pool_b_kit_index = 0  # Global kit index for Team B
         self.pool_a_allow_fixture_defaults = True
         self.pool_b_allow_fixture_defaults = True
+        # Global player position pools (shared across Home/Away panels)
+        self.pool_a_positions = {}  # Global saved positions for Team A players
+        self.pool_b_positions = {}  # Global saved positions for Team B players
         self.current_match_id = None
 
         # Initialize components

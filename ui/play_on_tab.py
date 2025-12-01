@@ -196,9 +196,6 @@ class _PossessionMixin:
         try:
             self.possession_team = "home"
             print("[PlayOn] Possession toggled: HOME")
-            # Hook for any stats/label update if implemented
-            if hasattr(self, "update_possession_ui"):
-                self.update_possession_ui("home")
         except Exception as e:
             print(f"[PlayOn] Error toggling home possession: {e}")
 
@@ -206,8 +203,6 @@ class _PossessionMixin:
         try:
             self.possession_team = "away"
             print("[PlayOn] Possession toggled: AWAY")
-            if hasattr(self, "update_possession_ui"):
-                self.update_possession_ui("away")
         except Exception as e:
             print(f"[PlayOn] Error toggling away possession: {e}")
 
@@ -1783,6 +1778,7 @@ class PlayOnTab(QWidget):
         self.timer_running = False
         self.extra_time_enabled = False
         self.extra_time_minutes = 0
+
         self.home_goals = 0
         self.away_goals = 0
         # Keep scoreboard side labels static by default
@@ -2066,7 +2062,6 @@ class PlayOnTab(QWidget):
     def load_match_data(self, match_data: dict):
         """Load match data into the UI (required by main window)"""
         try:
-            print(f"DEBUG: Loading match data in Play On tab: {match_data}")
             # Check if match has been created - gate to prevent data loading
             if not self.match_created:
                 print("DEBUG: Match not created yet, ignoring data load")
@@ -2604,42 +2599,8 @@ class PlayOnTab(QWidget):
             if not match_data:
                 return
 
-            # Load team logos if available
-            home_team_logo = match_data.get("home_team_logo", "")
-            away_team_logo = match_data.get("away_team_logo", "")
-
-            if home_team_logo:
-                # TODO: Load and display home team logo
-                pass
-
-            if away_team_logo:
-                # TODO: Load and display away team logo
-                pass
-
-            # Load venue information
-            venue = match_data.get("venue", "")
-            if venue:
-                # TODO: Display venue information if UI component exists
-                pass
-
-            # Load match date/time
-            match_date = match_data.get("date", "")
-            match_time = match_data.get("time", "")
-            if match_date or match_time:
-                # TODO: Display match timing if UI component exists
-                pass
-
-            # Load weather data
-            weather = match_data.get("weather", {})
-            if weather:
-                # TODO: Display weather information if UI component exists
-                pass
-
-            # Load attendance
-            attendance = match_data.get("attendance", "")
-            if attendance:
-                # TODO: Display attendance if UI component exists
-                pass
+            # Note: Additional fixture data loading (logos, venue, weather, attendance)
+            # is currently not implemented in the UI
 
         except Exception as e:
             print(f"Error loading additional fixture data: {e}")
@@ -5748,7 +5709,7 @@ class PlayOnTab(QWidget):
             # This ensures the first click performs a toggle action instead of just setting initial state
             if self.current_possession is None:
                 # First click: immediately toggle to away (so it's a toggle, not just a set)
-                self.current_possession = "away"
+                self.current_possession = "home"
                 if hasattr(self, "possession_toggle_btn"):
                     self.possession_toggle_btn.setText(away_short)
                     self._apply_possession_button_style("active")

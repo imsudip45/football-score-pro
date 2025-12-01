@@ -1002,7 +1002,9 @@ class TeamPanel(QWidget):
             selected_players = self.get_selected_players()
             if self.content_panel:
                 self.content_panel.update_formation(current_formation)
-                self.content_panel.update_selected_players(selected_players)
+                self.content_panel.update_selected_players(
+                    selected_players, self.current_data_source
+                )
                 if (
                     current_formation != TeamConstants.SELECT_FORMATION
                     and len(selected_rows) == 11
@@ -1197,7 +1199,9 @@ class TeamPanel(QWidget):
             if hasattr(self, "content_panel"):
                 # Use the same formation application logic as in on_selection_changed
                 self.content_panel.update_formation(formation)
-                self.content_panel.update_selected_players(selected_players)
+                self.content_panel.update_selected_players(
+                    selected_players, self.current_data_source
+                )
                 print(
                     f"Applied formation {formation} to field display with {len(selected_players)} players"
                 )
@@ -1541,7 +1545,9 @@ class TeamPanel(QWidget):
                 and len(selected_players) == 11
             ):
                 self.content_panel.update_formation(formation)
-                self.content_panel.update_selected_players(selected_players)
+                self.content_panel.update_selected_players(
+                    selected_players, self.current_data_source
+                )
                 # Ensure team color is reapplied too
                 color = (
                     self.team_a_color_1
@@ -1615,8 +1621,11 @@ class TeamPanel(QWidget):
 
             # Apply formation only if we have exactly 11 players and a valid formation
             if current_formation != "Select Formation" and len(selected_players) == 11:
+                # SIMPLIFIED: No need to manage state flags - ContentPanel handles this via global pool
                 self.content_panel.update_formation(current_formation)
-                self.content_panel.update_selected_players(selected_players)
+                self.content_panel.update_selected_players(
+                    selected_players, data_source
+                )
                 # Apply stored per-team color to this panel only
                 color = (
                     self.team_a_color_1
@@ -1720,9 +1729,16 @@ class TeamPanel(QWidget):
                                 "Select Formation", maintain_width=True
                             )
 
-            # Clear field display
+            # Clear field display and reset manual positioning flag
             if hasattr(self, "content_panel"):
                 self.content_panel.clear_field()
+                # Clear saved positions from global pools
+                match_setup_tab = self.content_panel._get_match_setup_tab()
+                if match_setup_tab:
+                    # Clear both pools on reset
+                    match_setup_tab.pool_a_positions.clear()
+                    match_setup_tab.pool_b_positions.clear()
+                    print(f"[{self.team_name}] Cleared global position pools on reset")
 
             # Update selected count display
             if hasattr(self, "info_panel"):

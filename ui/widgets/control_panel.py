@@ -628,29 +628,46 @@ class ControlPanel(QFrame):
 
     def toggle_coordinate_display(self):
         """Toggle coordinate display for player markers"""
-        try:
-            if self.coord_toggle_button is None:
-                return
-            show_coords = self.coord_toggle_button.isChecked()
-            print(f"Toggling coordinate display: {show_coords} in {self.team_name}")
+        if self.coord_toggle_button is None:
+            print(f"[ControlPanel] ERROR: coord_toggle_button is None!")
+            return
+        show_coords = self.coord_toggle_button.isChecked()
+        print(
+            f"[ControlPanel] Toggling coordinate display: {show_coords} in {self.team_name}"
+        )
 
-            # Update button text
-            if show_coords:
-                self.coord_toggle_button.setText("Hide Coordinates")
-            else:
-                self.coord_toggle_button.setText("Show Coordinates")
+        # Update button text
+        if show_coords:
+            self.coord_toggle_button.setText("Hide Coordinates")
+        else:
+            self.coord_toggle_button.setText("Show Coordinates")
 
-            # Update content panel
-            parent = self.parent()
-            content_panel = getattr(parent, "content_panel", None) if parent else None
-            if content_panel is not None:
-                content_panel.set_coordinate_display(show_coords)
+        # Update content panel - traverse up to find TeamPanel
+        current = self.parent()
+        team_panel = None
+        attempts = 0
+        while current and attempts < 5:
+            print(
+                f"[ControlPanel] Checking parent {attempts}: {current} ({type(current).__name__})"
+            )
+            if hasattr(current, "content_panel"):
+                team_panel = current
+                break
+            current = current.parent() if hasattr(current, "parent") else None
+            attempts += 1
 
-            # Emit data changed signal
-            self.data_changed.emit()
-        except Exception as e:
-            print(f"Error toggling coordinate display: {e}")
-            traceback.print_exc()
+        if team_panel:
+            content_panel = team_panel.content_panel
+            print(f"[ControlPanel] Found content_panel: {content_panel}")
+            print(f"[ControlPanel] Calling set_coordinate_display({show_coords})")
+            content_panel.set_coordinate_display(show_coords)
+        else:
+            print(
+                f"[ControlPanel] ERROR: Could not find TeamPanel with content_panel attribute!"
+            )
+
+        # Emit data changed signal
+        self.data_changed.emit()
 
     def get_panel_style(self, panel_type: str) -> str:
         """Get styling for different panel types"""

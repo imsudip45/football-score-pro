@@ -14,8 +14,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-
 class FormationPanel(QWidget):
     """Panel for formation selection and team data source"""
 
