@@ -469,7 +469,8 @@ class MainWindow(QMainWindow):
             self.end_match_button.show()
             self.lock_toggle_button.show()
 
-            # Keep status bar visible
+        # Keep status bar visible for all tabs
+        if hasattr(self, "status_bar"):
             self.status_bar.show()
 
     def _set_live_tabs_enabled(self, enabled: bool):
