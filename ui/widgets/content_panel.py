@@ -212,11 +212,8 @@ class PlayerMarker(QGraphicsItem):
         if not self._is_swapping:
             swapped = False
             # Check for collisions with other PlayerMarker items at release position
-            # Use a slightly larger bounding rect for easier collision detection
-            collision_rect = self.boundingRect()
-            collision_rect.adjust(-10, -10, 10, 10)  # Add padding for easier collision
-
-            # Get all items in the scene that intersect with our position
+            # Note: We detect collision at the current mouse position, but _swap_positions
+            # will use SAVED formation positions (not random mouse position) for the swap
             scene = self.scene()
             if scene:
                 items_at_pos = scene.items(self.pos())
@@ -227,6 +224,7 @@ class PlayerMarker(QGraphicsItem):
                         and not item._is_swapping
                     ):
                         # Found another player - swap positions
+                        # The swap will use proper formation positions from global pool
                         self._swap_positions(item)
                         swapped = True
                         break
@@ -278,18 +276,20 @@ class PlayerMarker(QGraphicsItem):
             self.content_panel, "_save_position_to_global_pool"
         ):
             # Build player key the same way ContentPanel does
-            key = f"{self.content_panel.current_team_source}|{self.player.get('id') or ''}|{self.player.get('jersey_number', self.player.get('jersey_no', ''))}|{self.player.get('full_name', self.player.get('name', ''))}"
+            key = self.content_panel._player_key(self.player)
             
             # CRITICAL: Always save goalkeeper at goalkeeper position, even if swapped
-            if self.content_panel._is_goalkeeper(self.player):
+            if self.content_panel._is_primary_goalkeeper_player(self.player):
                 pos = self.content_panel._get_goalkeeper_position()
+                player_name = self.content_panel._get_player_name(self.player)
                 print(
-                    f"[PlayerMarker] Saving position for {self.player.get('name', 'Unknown')} (GK) - FORCED to GK position ({pos.x():.1f}, {pos.y():.1f})"
+                    f"[PlayerMarker] Saving position for {player_name} (GK) - FORCED to GK position ({pos.x():.1f}, {pos.y():.1f})"
                 )
             else:
                 pos = self.pos()
+                player_name = self.content_panel._get_player_name(self.player)
                 print(
-                    f"[PlayerMarker] Saving position for {self.player.get('name', 'Unknown')} (key: {key}) to ({pos.x():.1f}, {pos.y():.1f})"
+                    f"[PlayerMarker] Saving position for {player_name} (key: {key}) to ({pos.x():.1f}, {pos.y():.1f})"
                 )
             self.content_panel._save_position_to_global_pool(key, pos)
         else:
@@ -301,34 +301,49 @@ class PlayerMarker(QGraphicsItem):
         """Swap positions with another player marker
 
         When player A is dragged onto player B:
-        - Player A moves to Player B's position
-        - Player B automatically moves to Player A's original position
+        - Player A moves to Player B's SAVED formation position (not random mouse position)
+        - Player B automatically moves to Player A's ORIGINAL saved position
+        
+        This ensures swaps always use proper formation positions, not random intermediate positions.
         """
         print(f"[PlayerMarker] _swap_positions called!")
         if self._is_swapping or other_marker._is_swapping:
             print(f"[PlayerMarker] Swap already in progress, returning")
             return
 
+        player_a_name = self.content_panel._get_player_name(self.player) if self.content_panel else self.player.get('name', '?')
+        player_b_name = self.content_panel._get_player_name(other_marker.player) if self.content_panel else other_marker.player.get('name', '?')
         print(
-            f"[PlayerMarker] Starting swap between {self.player.get('name', '?')} and {other_marker.player.get('name', '?')}"
+            f"[PlayerMarker] Starting swap between {player_a_name} and {player_b_name}"
         )
         self._is_swapping = True
         other_marker._is_swapping = True
 
         try:
-            # Get the dragged player's ORIGINAL position (before dragging started)
-            my_original_pos = getattr(self, "_drag_start_pos", self.pos())
-            # Get the target player's current position
-            other_pos = other_marker.pos()
+            # Use the canonical/original formation positions for swapping.
+            # This prevents accidental mouse drops from influencing the swap destination.
+            my_slot = QPointF(getattr(self, "_original_position", self.pos()))
+            other_slot = QPointF(
+                getattr(other_marker, "_original_position", other_marker.pos())
+            )
 
-            # The dragged player (self) goes to the target's position
-            # The target player goes to the dragged player's ORIGINAL position
-            self.setPos(other_pos)
-            other_marker.setPos(my_original_pos)
+            print(
+                f"[PlayerMarker] Swapping slots: {player_a_name} -> ({other_slot.x():.1f},{other_slot.y():.1f}), "
+                f"{player_b_name} -> ({my_slot.x():.1f},{my_slot.y():.1f})"
+            )
+
+            # The dragged player (self) goes to the target's formation slot
+            # The target player goes to the dragged player's formation slot
+            self.setPos(other_slot)
+            other_marker.setPos(my_slot)
 
             # Update stored positions
-            self.position = other_pos
-            other_marker.position = my_original_pos
+            self.position = other_slot
+            other_marker.position = my_slot
+
+            # Update canonical slots so future swaps respect new ownership
+            self._original_position = QPointF(other_slot)
+            other_marker._original_position = QPointF(my_slot)
 
             # Mark that players have been manually positioned
             print(
@@ -348,26 +363,26 @@ class PlayerMarker(QGraphicsItem):
                 )
                 
                 # CRITICAL: If goalkeeper was swapped, move them back to GK position
-                if self.content_panel._is_goalkeeper(self.player):
+                if self.content_panel._is_primary_goalkeeper_player(self.player):
                     gk_pos = self.content_panel._get_goalkeeper_position()
                     self.setPos(gk_pos)
                     self.position = gk_pos
                     print(
-                        f"[PlayerMarker] Goalkeeper {self.player.get('name', 'Unknown')} moved back to GK position after swap"
+                        f"[PlayerMarker] Goalkeeper {self.content_panel._get_player_name(self.player)} moved back to GK position after swap"
                     )
-                if self.content_panel._is_goalkeeper(other_marker.player):
+                if self.content_panel._is_primary_goalkeeper_player(other_marker.player):
                     gk_pos = self.content_panel._get_goalkeeper_position()
                     other_marker.setPos(gk_pos)
                     other_marker.position = gk_pos
                     print(
-                        f"[PlayerMarker] Goalkeeper {other_marker.player.get('name', 'Unknown')} moved back to GK position after swap"
+                        f"[PlayerMarker] Goalkeeper {self.content_panel._get_player_name(other_marker.player)} moved back to GK position after swap"
                     )
                 
                 # Save both players' new positions to global pool IMMEDIATELY after swap
                 # This ensures swapped positions are persisted before any other operations
-                print(f"[PlayerMarker] Saving swapped position for {self.player.get('name', 'Unknown')}...")
+                print(f"[PlayerMarker] Saving swapped position for {self.content_panel._get_player_name(self.player)}...")
                 self._save_position_to_global_pool()
-                print(f"[PlayerMarker] Saving swapped position for {other_marker.player.get('name', 'Unknown')}...")
+                print(f"[PlayerMarker] Saving swapped position for {self.content_panel._get_player_name(other_marker.player)}...")
                 other_marker._save_position_to_global_pool()
                 print("[PlayerMarker] Both swapped positions saved to global pool")
             else:
@@ -375,12 +390,8 @@ class PlayerMarker(QGraphicsItem):
                     f"[PlayerMarker] ERROR: Cannot save positions - content_panel check failed!"
                 )
 
-            player_a_num = self.player.get(
-                "jersey_number", self.player.get("jersey_no", "?")
-            )
-            player_b_num = other_marker.player.get(
-                "jersey_number", other_marker.player.get("jersey_no", "?")
-            )
+            player_a_num = self.content_panel._get_jersey_number(self.player) if self.content_panel else "?"
+            player_b_num = self.content_panel._get_jersey_number(other_marker.player) if self.content_panel else "?"
             print(
                 f"Swapped players: {player_a_num} (moved to {other_marker.player.get('position', '?')} position) <-> {player_b_num} (moved to {self.player.get('position', '?')} position)"
             )
@@ -392,6 +403,10 @@ class PlayerMarker(QGraphicsItem):
 
 class ContentPanel(QWidget):
     """Panel for displaying the football field with player positions"""
+
+    # Field dimension constants
+    STANDARD_FIELD_WIDTH = 1000
+    STANDARD_FIELD_HEIGHT = 750
 
     formation_applied = Signal(str)
 
@@ -421,6 +436,7 @@ class ContentPanel(QWidget):
         self._initial_scaling_done = False  # Flag to track if initial scaling is done
         self._first_show_done = False  # Flag to track if first show event is done
         self.field_frame = None  # Will be set in setup_ui
+        self._primary_goalkeeper_key = None  # Track which GK should occupy GK slot
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setup_ui()
 
@@ -440,9 +456,10 @@ class ContentPanel(QWidget):
             "QGraphicsView { border: none; background: transparent; }"
         )
         self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
-        # Use minimal update mode to prevent shake when adding items
+        # Use full viewport updates so dragged markers repaint cleanly (prevents dotted trails/artifacts)
+        # Slightly more expensive but safe for our small number of items.
         self.view.setViewportUpdateMode(
-            QGraphicsView.ViewportUpdateMode.MinimalViewportUpdate
+            QGraphicsView.ViewportUpdateMode.FullViewportUpdate
         )
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -462,9 +479,7 @@ class ContentPanel(QWidget):
 
         # Set a consistent scene rectangle for all panels - moderately larger for good visibility
         # This ensures both home and away team panels have the same ground size
-        STANDARD_FIELD_WIDTH = 1000  # Moderately larger than original 800
-        STANDARD_FIELD_HEIGHT = 750  # Moderately larger than original 600
-        self.scene.setSceneRect(0, 0, STANDARD_FIELD_WIDTH, STANDARD_FIELD_HEIGHT)
+        self.scene.setSceneRect(0, 0, self.STANDARD_FIELD_WIDTH, self.STANDARD_FIELD_HEIGHT)
 
         # Try to load ground image
         ground_path = Path("resources/images/Ground.png")
@@ -476,8 +491,8 @@ class ContentPanel(QWidget):
                     field_item.setZValue(0)
                     # Center the image in the scene
                     field_item.setPos(
-                        (STANDARD_FIELD_WIDTH - pixmap.width()) / 2,
-                        (STANDARD_FIELD_HEIGHT - pixmap.height()) / 2,
+                        (self.STANDARD_FIELD_WIDTH - pixmap.width()) / 2,
+                        (self.STANDARD_FIELD_HEIGHT - pixmap.height()) / 2,
                     )
                 else:
                     self.set_placeholder_text("Failed to load Ground.png")
@@ -562,23 +577,19 @@ class ContentPanel(QWidget):
                 f"\n[ContentPanel {self.team_name}] ========== update_selected_players called with {len(players)} players for {self.current_team_source} =========="
             )
 
-            def _player_key(p: Dict[str, Any], team_src: str = None) -> str:
-                # Include team source in the key to separate Team A and Team B positions
-                # Use provided team_src or current_team_source
-                src = team_src or self.current_team_source
-                return f"{src}|{p.get('id') or ''}|{p.get('jersey_number', p.get('jersey_no', ''))}|{p.get('full_name', p.get('name', ''))}"
-
             # Build maps for new selection using NEW team source
-            new_players_by_key = {_player_key(p): p for p in (players or [])}
+            new_players_by_key = {self._player_key(p): p for p in (players or [])}
+
+            # Determine which goalkeeper (if any) should occupy the GK slot
+            self._primary_goalkeeper_key = None
+            for key, player in new_players_by_key.items():
+                if self._is_goalkeeper(player):
+                    self._primary_goalkeeper_key = key
+                    break
 
             # Get global pool size for debugging (using NEW team source)
-            match_setup_tab = self._get_match_setup_tab()
-            global_pool_size = 0
-            if match_setup_tab:
-                if self.current_team_source == "Team A":
-                    global_pool_size = len(match_setup_tab.pool_a_positions)
-                else:
-                    global_pool_size = len(match_setup_tab.pool_b_positions)
+            pool = self._get_position_pool()
+            global_pool_size = len(pool) if pool else 0
 
             print(
                 f"[ContentPanel {self.team_name}] Team: {self.current_team_source}, Pool has {global_pool_size} positions"
@@ -596,12 +607,12 @@ class ContentPanel(QWidget):
                 self.current_team_source = old_team_source
                 for m in list(self.player_markers):
                     try:
-                        key = _player_key(m.player, old_team_source)
+                        key = self._player_key(m.player, old_team_source)
                         if key:
                             pos = m.pos()
                             self._save_position_to_global_pool(key, pos)
                             print(
-                                f"[SAVE] {m.player.get('name', 'Unknown')} to {old_team_source} pool at ({pos.x():.1f}, {pos.y():.1f})"
+                                f"[SAVE] {self._get_player_name(m.player)} to {old_team_source} pool at ({pos.x():.1f}, {pos.y():.1f})"
                             )
                     except Exception as e:
                         print(f"  - Error saving position: {e}")
@@ -616,12 +627,12 @@ class ContentPanel(QWidget):
                 )
                 for m in list(self.player_markers):
                     try:
-                        key = _player_key(m.player)
+                        key = self._player_key(m.player)
                         if key:
                             pos = m.pos()
                             self._save_position_to_global_pool(key, pos)
                             print(
-                                f"[SAVE] {m.player.get('name', 'Unknown')} at ({pos.x():.1f}, {pos.y():.1f})"
+                                f"[SAVE] {self._get_player_name(m.player)} at ({pos.x():.1f}, {pos.y():.1f})"
                             )
                     except Exception as e:
                         print(f"  - Error saving position: {e}")
@@ -631,22 +642,12 @@ class ContentPanel(QWidget):
                 )
 
             # Clear all existing markers
-            for m in list(self.player_markers):
-                self.scene.removeItem(m)
-            self.player_markers.clear()
+            self._clear_all_markers()
 
             # Remove positions for players no longer in the new selection
             # BUT: Only remove if we have a non-empty selection - preserve pool if 0 players selected
-            if match_setup_tab and len(players) > 0:
-                pool = (
-                    match_setup_tab.pool_a_positions
-                    if self.current_team_source == "Team A"
-                    else match_setup_tab.pool_b_positions
-                )
-                keys_to_remove = []
-                for key in pool.keys():
-                    if key not in new_players_by_key:
-                        keys_to_remove.append(key)
+            if pool and len(players) > 0:
+                keys_to_remove = [key for key in pool.keys() if key not in new_players_by_key]
                 for key in keys_to_remove:
                     pool.pop(key, None)
                     print(
@@ -665,21 +666,16 @@ class ContentPanel(QWidget):
                 )
                 # Create markers at center positions first (apply_formation_to_players needs existing markers)
                 self.view.setUpdatesEnabled(False)
-                rect = self.scene.sceneRect()
-                cx = rect.width() / 2.0
-                cy = rect.height() / 2.0
+                cx, cy = self._get_scene_center()
                 
                 for key, p in new_players_by_key.items():
                     # Place all players at center initially (formation will reposition them)
-                    if self._is_goalkeeper(p):
-                        pos = self._get_goalkeeper_position()
-                    else:
-                        pos = QPointF(cx, cy)
-                    
-                    marker = PlayerMarker(p, pos, self.team_color, self)
-                    marker.show_coordinates = getattr(self, "show_coordinates", False)
-                    self.scene.addItem(marker)
-                    self.player_markers.append(marker)
+                    pos = (
+                        self._get_goalkeeper_position()
+                        if self._is_primary_goalkeeper_player(p)
+                        else QPointF(cx, cy)
+                    )
+                    self._create_marker(p, pos)
                 
                 self.view.setUpdatesEnabled(True)
                 self.selected_players = players
@@ -697,35 +693,29 @@ class ContentPanel(QWidget):
             self.view.setUpdatesEnabled(False)
 
             # Create fresh markers for all players, loading positions from global pool
-            rect = self.scene.sceneRect()
-            cx = rect.width() / 2.0
-            cy = rect.height() / 2.0
+            cx, cy = self._get_scene_center()
 
             for key, p in new_players_by_key.items():
                 # Check if we have a saved position for this player from global pool
                 saved_pos = self._get_position_from_global_pool(key)
                 
-                # CRITICAL: Always place goalkeeper at goalkeeper position
-                if self._is_goalkeeper(p):
+                # CRITICAL: Only the designated primary GK is forced to GK position
+                if self._is_primary_goalkeeper_player(p):
                     pos = self._get_goalkeeper_position()
-                    player_name = p.get("full_name", p.get("name", "Unknown"))
+                    player_name = self._get_player_name(p)
                     print(
                         f"[LOAD] {player_name} (GK) | Key: {key[:30]}... | Pos: FORCED to GK position ({pos.x():.1f}, {pos.y():.1f})"
                     )
                 elif saved_pos:
                     pos = saved_pos
-                    # Show both player name and key for debugging
-                    player_name = p.get("full_name", p.get("name", "Unknown"))
+                    player_name = self._get_player_name(p)
                     print(
                         f"[LOAD] {player_name} | Key: {key[:30]}... | Pos: ({pos.x():.1f}, {pos.y():.1f})"
                     )
                 else:
                     pos = QPointF(cx, cy)
 
-                marker = PlayerMarker(p, pos, self.team_color, self)
-                marker.show_coordinates = getattr(self, "show_coordinates", False)
-                self.scene.addItem(marker)
-                self.player_markers.append(marker)
+                self._create_marker(p, pos)
 
             # Re-enable viewport updates after all items are added
             self.view.setUpdatesEnabled(True)
@@ -755,15 +745,8 @@ class ContentPanel(QWidget):
                     # If all are center, it means pool was populated before formation was applied
                     # In this case, we should apply formation to get proper positions
                     all_center = True
-                    if match_setup_tab:
-                        pool = (
-                            match_setup_tab.pool_a_positions
-                            if self.current_team_source == "Team A"
-                            else match_setup_tab.pool_b_positions
-                        )
-                        rect = self.scene.sceneRect()
-                        center_x = rect.width() / 2.0
-                        center_y = rect.height() / 2.0
+                    if pool:
+                        center_x, center_y = self._get_scene_center()
                         for pos in pool.values():
                             if abs(pos.x() - center_x) > 10 or abs(pos.y() - center_y) > 10:
                                 all_center = False
@@ -790,8 +773,6 @@ class ContentPanel(QWidget):
                     f"[ContentPanel] Showing {len(players)} players without formation (formation={self.formation})"
                 )
 
-            # Don't immediately update scene to avoid shake - let debounced scaling handle it
-            # self.scene.update()
         except Exception as e:
             print(f"[ContentPanel] Error in update_selected_players: {e}")
             import traceback
@@ -806,8 +787,6 @@ class ContentPanel(QWidget):
             marker.team_color = color
             marker._invalidate_cache()
             marker.update()
-        # Don't immediately update scene to avoid shake
-        # self.scene.update()
 
     def toggle_coordinate_display(self, show: Optional[bool] = None):
         """Toggle coordinate display for all player markers"""
@@ -834,16 +813,11 @@ class ContentPanel(QWidget):
             self.scene.update()
             print(f"[ContentPanel {self.team_name}] Scene updated")
 
-    def set_coordinate_display(self, show: bool):
-        """Set coordinate display for all player markers"""
-        self.toggle_coordinate_display(show)
 
     def update_player_positions(self):
         """Update player positions based on formation and selected players"""
         # Clear existing markers
-        for marker in self.player_markers:
-            self.scene.removeItem(marker)
-        self.player_markers.clear()
+        self._clear_all_markers()
 
         # Only show players if we have both players and a valid formation
         if (
@@ -859,8 +833,7 @@ class ContentPanel(QWidget):
             if i < len(positions):
                 position = positions[i]
                 # Create new player marker with updated visual style
-                marker = PlayerMarker(player, position, self.team_color)
-                # Set coordinate display setting
+                marker = PlayerMarker(player, position, self.team_color, self)
                 marker.show_coordinates = getattr(self, "show_coordinates", True)
                 self.scene.addItem(marker)
                 self.player_markers.append(marker)
@@ -868,7 +841,7 @@ class ContentPanel(QWidget):
         # Don't force immediate update to avoid shake
         # self.scene.update()
 
-    def apply_formation(self, formation: str):
+    def apply_formation(self, formation: str, silent: bool = False):
         """Apply formation with advanced positioning logic"""
         try:
             if formation == "Select Formation":
@@ -876,9 +849,7 @@ class ContentPanel(QWidget):
             if len(self.selected_players) == 11:
                 self.formation = formation
                 self.formation_state["formation"] = formation
-                self.formation_already_applied = (
-                    False  # Reset flag to allow new formation
-                )
+                self.formation_already_applied = False  # Reset flag to allow new formation
                 self.apply_formation_to_players(formation)
                 self.formation_already_applied = True  # Mark as applied
                 self.formation_applied.emit(formation)
@@ -886,27 +857,13 @@ class ContentPanel(QWidget):
                 self.formation = formation
                 self.formation_state["formation"] = formation
         except Exception as e:
-            print(f"Error in apply_formation: {str(e)}")
+            error_msg = f"Error in apply_formation: {str(e)}"
+            if not silent:
+                print(error_msg)
 
     def apply_formation_silent(self, formation: str):
         """Apply formation without showing warnings (for automatic application)"""
-        try:
-            if formation == "Select Formation":
-                return
-            if len(self.selected_players) == 11:
-                self.formation = formation
-                self.formation_state["formation"] = formation
-                self.formation_already_applied = (
-                    False  # Reset flag to allow new formation
-                )
-                self.apply_formation_to_players(formation)
-                self.formation_already_applied = True  # Mark as applied
-                self.formation_applied.emit(formation)
-            else:
-                self.formation = formation
-                self.formation_state["formation"] = formation
-        except Exception as e:
-            print(f"Error in apply_formation_silent: {str(e)}")
+        self.apply_formation(formation, silent=True)
 
     def update_formation(self, formation: str):
         """Update formation and apply it if formation actually changed"""
@@ -973,9 +930,7 @@ class ContentPanel(QWidget):
                 return
 
             # Scene center
-            rect = self.scene.sceneRect()
-            center_x = rect.width() / 2.0
-            center_y = rect.height() / 2.0
+            center_x, center_y = self._get_scene_center()
 
             # 1) Build target positions (center-relative like old app)
             positions = [(0, -300)]  # GK
@@ -1016,7 +971,7 @@ class ContentPanel(QWidget):
             gk_marker = None
             outfield_markers = []
             for m in self.player_markers:
-                if self._is_goalkeeper(m.player):
+                if self._is_primary_goalkeeper_player(m.player):
                     gk_marker = m
                 else:
                     outfield_markers.append(m)
@@ -1077,29 +1032,13 @@ class ContentPanel(QWidget):
             # Build final_centers in the order of self.selected_players
             final_centers = []
             for player in self.selected_players:
-                # Find the marker for this player
-                player_marker = None
-                for m in self.player_markers:
-                    # Try multiple matching strategies
-                    player_id = player.get('id', '')
-                    player_jersey = player.get('jersey_number', player.get('jersey_no', ''))
-                    player_name = player.get('full_name', player.get('name', ''))
-                    
-                    marker_id = m.player.get('id', '')
-                    marker_jersey = m.player.get('jersey_number', m.player.get('jersey_no', ''))
-                    marker_name = m.player.get('full_name', m.player.get('name', ''))
-                    
-                    if (player_id and marker_id and player_id == marker_id) or \
-                       (player_jersey and marker_jersey and str(player_jersey) == str(marker_jersey)) or \
-                       (player_name and marker_name and player_name == marker_name):
-                        player_marker = m
-                        break
+                player_marker = self._match_player_to_marker(player)
                 
                 if player_marker and player_marker in marker_to_position:
                     final_centers.append(marker_to_position[player_marker])
                 else:
                     # Fallback to center if marker not found - but log it for debugging
-                    print(f"[WARNING] Could not find position for player {player.get('name', 'Unknown')} (ID: {player.get('id', 'N/A')}, Jersey: {player.get('jersey_number', player.get('jersey_no', 'N/A'))})")
+                    print(f"[WARNING] Could not find position for player {self._get_player_name(player)} (ID: {player.get('id', 'N/A')}, Jersey: {self._get_jersey_number(player)})")
                     final_centers.append((int(center_x), int(center_y)))
             
             # Fill any missing with true center
@@ -1114,14 +1053,8 @@ class ContentPanel(QWidget):
     def update_player_markers_with_positions(self, positions: List[tuple]):
         """Update player markers with calculated positions"""
         try:
-            # Build player key function for checking existing positions
-            def _player_key(p: Dict[str, Any]) -> str:
-                return f"{self.current_team_source}|{p.get('id') or ''}|{p.get('jersey_number', p.get('jersey_no', ''))}|{p.get('full_name', p.get('name', ''))}"
-
             # Clear existing markers
-            for marker in self.player_markers:
-                self.scene.removeItem(marker)
-            self.player_markers.clear()
+            self._clear_all_markers()
 
             # CRITICAL: Separate goalkeeper from outfield players
             # The positions list is in the same order as self.selected_players
@@ -1148,7 +1081,9 @@ class ContentPanel(QWidget):
                     print(f"[ContentPanel {self.team_name}] Found GK position in positions list at index {i} (distance: {dist:.1f})")
             
             # Count how many outfield players we have
-            outfield_player_count = sum(1 for p in self.selected_players if not self._is_goalkeeper(p))
+            outfield_player_count = sum(
+                1 for p in self.selected_players if not self._is_primary_goalkeeper_player(p)
+            )
             
             # Build list of outfield positions (excluding GK position)
             outfield_positions = []
@@ -1159,34 +1094,32 @@ class ContentPanel(QWidget):
             # Ensure we have enough positions for all outfield players
             if len(outfield_positions) < outfield_player_count:
                 print(f"[WARNING] Only {len(outfield_positions)} outfield positions for {outfield_player_count} outfield players. Adding center positions.")
-                rect = self.scene.sceneRect()
-                cx = rect.width() / 2.0
-                cy = rect.height() / 2.0
+                cx, cy = self._get_scene_center()
                 while len(outfield_positions) < outfield_player_count:
                     outfield_positions.append((int(cx), int(cy)))
             
             # Create markers for all players
             outfield_pos_idx = 0
             for i, player in enumerate(self.selected_players):
-                if self._is_goalkeeper(player):
+                if self._is_primary_goalkeeper_player(player):
                     # CRITICAL: Always place goalkeeper at goalkeeper position
                     position = self._get_goalkeeper_position()
                     print(
-                        f"[ContentPanel {self.team_name}] FORCING goalkeeper {player.get('name', 'Unknown')} to GK position ({position.x():.1f}, {position.y():.1f})"
+                        f"[ContentPanel {self.team_name}] FORCING goalkeeper {self._get_player_name(player)} to GK position ({position.x():.1f}, {position.y():.1f})"
                     )
                 else:
                     # For outfield players, use positions from outfield_positions list
                     if outfield_pos_idx < len(outfield_positions):
                         x, y = outfield_positions[outfield_pos_idx]
                         # Check if this player has a manually saved position in the global pool
-                        player_key = _player_key(player)
+                        player_key = self._player_key(player)
                         saved_pos = self._get_position_from_global_pool(player_key)
                         
                         if saved_pos and self.players_manually_positioned:
                             # Use saved position (from swap) instead of formation position
                             position = saved_pos
                             print(
-                                f"[ContentPanel {self.team_name}] Preserving manually positioned player {player.get('name', 'Unknown')} at ({position.x():.1f}, {position.y():.1f})"
+                                f"[ContentPanel {self.team_name}] Preserving manually positioned player {self._get_player_name(player)} at ({position.x():.1f}, {position.y():.1f})"
                             )
                         else:
                             # Use formation position
@@ -1194,27 +1127,16 @@ class ContentPanel(QWidget):
                         outfield_pos_idx += 1
                     else:
                         # Fallback to center if not enough positions
-                        rect = self.scene.sceneRect()
-                        position = QPointF(rect.width() / 2.0, rect.height() / 2.0)
+                        cx, cy = self._get_scene_center()
+                        position = QPointF(cx, cy)
                 
                 # Create new marker with improved visual style
-                marker = PlayerMarker(player, position, self.team_color, self)
-                # Set coordinate display setting
-                marker.show_coordinates = getattr(self, "show_coordinates", False)
-                self.scene.addItem(marker)
-                self.player_markers.append(marker)
+                self._create_marker(player, position)
 
             # Only save positions to global pool if players haven't been manually positioned
             # OR if this is the first time (pool is empty)
-            match_setup_tab = self._get_match_setup_tab()
-            pool_size = 0
-            if match_setup_tab:
-                pool = (
-                    match_setup_tab.pool_a_positions
-                    if self.current_team_source == "Team A"
-                    else match_setup_tab.pool_b_positions
-                )
-                pool_size = len(pool)
+            pool = self._get_position_pool()
+            pool_size = len(pool) if pool else 0
             
             if not self.players_manually_positioned or pool_size == 0:
                 # Save positions to global pool after formation application
@@ -1254,11 +1176,9 @@ class ContentPanel(QWidget):
 
     def _get_goalkeeper_position(self) -> QPointF:
         """Get the standard goalkeeper position on the field"""
-        field_width = 1000  # STANDARD_FIELD_WIDTH
-        field_height = 750  # STANDARD_FIELD_HEIGHT
-        goal_box_depth = field_height * 0.11
-        gk_y = field_height - goal_box_depth - 15 + 25  # A bit more space from goal box, moved down 25px
-        gk_x = field_width / 2 + 30 - 20  # Shift goalkeeper 10px to the right (was 30, now 10 after moving left 20px)
+        goal_box_depth = self.STANDARD_FIELD_HEIGHT * 0.11
+        gk_y = self.STANDARD_FIELD_HEIGHT - goal_box_depth - 15 + 25  # A bit more space from goal box, moved down 25px
+        gk_x = self.STANDARD_FIELD_WIDTH / 2 + 30 - 20 - 10  # Moved left by 10px (was 10px right of center, now at center)
         return QPointF(gk_x, gk_y)
 
     def _is_goalkeeper(self, player: Dict[str, Any]) -> bool:
@@ -1282,28 +1202,23 @@ class ContentPanel(QWidget):
 
         positions = []
         # Use standard field dimensions for consistent positioning
-        field_width = 1000  # STANDARD_FIELD_WIDTH (moderately larger than original)
-        field_height = 750  # STANDARD_FIELD_HEIGHT (moderately larger than original)
-
         # Define field boundaries with proper margins
         margin = 50  # Slightly larger margin from field edges
-        goal_box_depth = field_height * 0.11  # Slightly smaller goal box depth
+        goal_box_depth = self.STANDARD_FIELD_HEIGHT * 0.11  # Slightly smaller goal box depth
 
         # Goalkeeper at the edge of goal box (not inside) - shifted more right
         gk_pos = self._get_goalkeeper_position()
         positions.append(gk_pos)  # Center-based positioning with more right shift
 
         # Calculate safe field area for outfield players
-        safe_width = field_width - (2 * margin)
-        safe_height = field_height - goal_box_depth - (margin * 1.5)
+        safe_width = self.STANDARD_FIELD_WIDTH - (2 * margin)
+        safe_height = self.STANDARD_FIELD_HEIGHT - goal_box_depth - (margin * 1.5)
+        right_offset = 30  # Shift players 30px to the right
 
         # Defenders closer to goalkeeper but with more spacing (defensive third) - shifted more right
         if defenders > 0:
             spacing = safe_width / (defenders + 1)
-            def_y = field_height - (
-                safe_height * 0.35
-            )  # 35% from bottom for better spacing
-            right_offset = 30  # Shift players 30px to the right
+            def_y = self.STANDARD_FIELD_HEIGHT - (safe_height * 0.35)  # 35% from bottom for better spacing
             for i in range(defenders):
                 x = margin + spacing * (i + 1) + right_offset
                 positions.append(QPointF(x, def_y))
@@ -1311,10 +1226,7 @@ class ContentPanel(QWidget):
         # Midfielders in the middle (middle third) - centered around field center, shifted more right
         if midfielders > 0:
             spacing = safe_width / (midfielders + 1)
-            mid_y = field_height - (
-                safe_height * 0.60
-            )  # 60% from bottom for better distribution
-            right_offset = 30  # Shift players 30px to the right
+            mid_y = self.STANDARD_FIELD_HEIGHT - (safe_height * 0.60)  # 60% from bottom for better distribution
             for i in range(midfielders):
                 x = margin + spacing * (i + 1) + right_offset
                 positions.append(QPointF(x, mid_y))
@@ -1322,10 +1234,7 @@ class ContentPanel(QWidget):
         # Forwards at the top (attacking third) - centered around field center, shifted more right
         if forwards > 0:
             spacing = safe_width / (forwards + 1)
-            fwd_y = field_height - (
-                safe_height * 0.85
-            )  # 85% from bottom for better attacking position
-            right_offset = 30  # Shift players 30px to the right
+            fwd_y = self.STANDARD_FIELD_HEIGHT - (safe_height * 0.85)  # 85% from bottom for better attacking position
             for i in range(forwards):
                 x = margin + spacing * (i + 1) + right_offset
                 positions.append(QPointF(x, fwd_y))
@@ -1342,9 +1251,7 @@ class ContentPanel(QWidget):
             for line in traceback.format_stack()[-4:-1]:
                 print(line.strip())
             # Clear existing markers
-            for marker in self.player_markers:
-                self.scene.removeItem(marker)
-            self.player_markers.clear()
+            self._clear_all_markers()
 
             # Clear selected players
             self.selected_players = []
@@ -1509,59 +1416,105 @@ class ContentPanel(QWidget):
             parent = parent.parent() if hasattr(parent, "parent") else None
         return None
 
-    def _save_position_to_global_pool(self, key: str, position: QPointF):
-        """Save position to global pool in parent MatchSetupTab"""
+    def _get_position_pool(self):
+        """Get the appropriate position pool (Team A or Team B)"""
         match_setup_tab = self._get_match_setup_tab()
         if match_setup_tab:
-            if self.current_team_source == "Team A":
-                old_pos = match_setup_tab.pool_a_positions.get(key)
-                match_setup_tab.pool_a_positions[key] = position
-                if old_pos:
-                    print(
-                        f"[ContentPanel] UPDATED position for {key[:40]}... in pool_a_positions: OLD ({old_pos.x():.1f}, {old_pos.y():.1f}) -> NEW ({position.x():.1f}, {position.y():.1f})"
-                    )
-                else:
-                    print(
-                        f"[ContentPanel] Saved NEW position for {key[:40]}... to pool_a_positions: ({position.x():.1f}, {position.y():.1f})"
-                    )
+            return (
+                match_setup_tab.pool_a_positions
+                if self.current_team_source == "Team A"
+                else match_setup_tab.pool_b_positions
+            )
+        return None
+
+    def _get_scene_center(self):
+        """Get the center coordinates of the scene as (x, y) tuple"""
+        rect = self.scene.sceneRect()
+        return rect.width() / 2.0, rect.height() / 2.0
+
+    def _player_key(self, player: Dict[str, Any], team_src: str = None) -> str:
+        """Generate a unique key for a player"""
+        src = team_src or self.current_team_source
+        return f"{src}|{player.get('id') or ''}|{self._get_jersey_number(player)}|{self._get_player_name(player)}"
+
+    def _is_primary_goalkeeper_player(self, player: Dict[str, Any]) -> bool:
+        """Check if player is the designated primary goalkeeper for GK slot"""
+        if not player:
+            return False
+        if not self._primary_goalkeeper_key:
+            return False
+        return self._player_key(player) == self._primary_goalkeeper_key
+
+    def _get_jersey_number(self, player: Dict[str, Any]) -> str:
+        """Get jersey number from player dict with fallback"""
+        return str(player.get('jersey_number', player.get('jersey_no', '')))
+
+    def _get_player_name(self, player: Dict[str, Any]) -> str:
+        """Get player name from player dict with fallback"""
+        return player.get('full_name', player.get('name', ''))
+
+    def _clear_all_markers(self):
+        """Clear all player markers from the scene"""
+        for marker in list(self.player_markers):
+            self.scene.removeItem(marker)
+        self.player_markers.clear()
+
+    def _create_marker(self, player: Dict[str, Any], position: QPointF) -> PlayerMarker:
+        """Create a new player marker with standard settings"""
+        marker = PlayerMarker(player, position, self.team_color, self)
+        marker.show_coordinates = getattr(self, "show_coordinates", False)
+        self.scene.addItem(marker)
+        self.player_markers.append(marker)
+        return marker
+
+    def _match_player_to_marker(self, player: Dict[str, Any]) -> Optional[PlayerMarker]:
+        """Find the marker matching a given player"""
+        player_id = player.get('id', '')
+        player_jersey = self._get_jersey_number(player)
+        player_name = self._get_player_name(player)
+        
+        for m in self.player_markers:
+            marker_id = m.player.get('id', '')
+            marker_jersey = self._get_jersey_number(m.player)
+            marker_name = self._get_player_name(m.player)
+            
+            if (player_id and marker_id and player_id == marker_id) or \
+               (player_jersey and marker_jersey and player_jersey == marker_jersey) or \
+               (player_name and marker_name and player_name == marker_name):
+                return m
+        return None
+
+    def _save_position_to_global_pool(self, key: str, position: QPointF):
+        """Save position to global pool in parent MatchSetupTab"""
+        pool = self._get_position_pool()
+        if pool is not None:
+            pool_name = "pool_a_positions" if self.current_team_source == "Team A" else "pool_b_positions"
+            old_pos = pool.get(key)
+            pool[key] = position
+            if old_pos:
+                print(
+                    f"[ContentPanel] UPDATED position for {key[:40]}... in {pool_name}: OLD ({old_pos.x():.1f}, {old_pos.y():.1f}) -> NEW ({position.x():.1f}, {position.y():.1f})"
+                )
             else:
-                old_pos = match_setup_tab.pool_b_positions.get(key)
-                match_setup_tab.pool_b_positions[key] = position
-                if old_pos:
-                    print(
-                        f"[ContentPanel] UPDATED position for {key[:40]}... in pool_b_positions: OLD ({old_pos.x():.1f}, {old_pos.y():.1f}) -> NEW ({position.x():.1f}, {position.y():.1f})"
-                    )
-                else:
-                    print(
-                        f"[ContentPanel] Saved NEW position for {key[:40]}... to pool_b_positions: ({position.x():.1f}, {position.y():.1f})"
-                    )
+                print(
+                    f"[ContentPanel] Saved NEW position for {key[:40]}... to {pool_name}: ({position.x():.1f}, {position.y():.1f})"
+                )
 
     def _get_position_from_global_pool(self, key: str) -> Optional[QPointF]:
         """Get position from global pool in parent MatchSetupTab"""
-        match_setup_tab = self._get_match_setup_tab()
-        if match_setup_tab:
-            if self.current_team_source == "Team A":
-                pos = match_setup_tab.pool_a_positions.get(key)
-                if pos:
-                    print(
-                        f"[ContentPanel {self.team_name}] Found position in pool_a_positions for {key[:40]}...: ({pos.x():.1f}, {pos.y():.1f})"
-                    )
-                else:
-                    print(
-                        f"[ContentPanel {self.team_name}] No position found in pool_a_positions for {key[:40]}... (pool has {len(match_setup_tab.pool_a_positions)} entries)"
-                    )
-                return pos
+        pool = self._get_position_pool()
+        if pool is not None:
+            pool_name = "pool_a_positions" if self.current_team_source == "Team A" else "pool_b_positions"
+            pos = pool.get(key)
+            if pos:
+                print(
+                    f"[ContentPanel {self.team_name}] Found position in {pool_name} for {key[:40]}...: ({pos.x():.1f}, {pos.y():.1f})"
+                )
             else:
-                pos = match_setup_tab.pool_b_positions.get(key)
-                if pos:
-                    print(
-                        f"[ContentPanel {self.team_name}] Found position in pool_b_positions for {key[:40]}...: ({pos.x():.1f}, {pos.y():.1f})"
-                    )
-                else:
-                    print(
-                        f"[ContentPanel {self.team_name}] No position found in pool_b_positions for {key[:40]}... (pool has {len(match_setup_tab.pool_b_positions)} entries)"
-                    )
-                return pos
+                print(
+                    f"[ContentPanel {self.team_name}] No position found in {pool_name} for {key[:40]}... (pool has {len(pool)} entries)"
+                )
+            return pos
         print(
             f"[ContentPanel {self.team_name}] WARNING: Could not get match_setup_tab for position lookup"
         )
@@ -1569,15 +1522,10 @@ class ContentPanel(QWidget):
 
     def _remove_position_from_global_pool(self, key: str):
         """Remove position from global pool in parent MatchSetupTab"""
-        match_setup_tab = self._get_match_setup_tab()
-        if match_setup_tab:
-            if self.current_team_source == "Team A":
-                match_setup_tab.pool_a_positions.pop(key, None)
-                print(
-                    f"[ContentPanel] Removed position for {key} from pool_a_positions"
-                )
-            else:
-                match_setup_tab.pool_b_positions.pop(key, None)
-                print(
-                    f"[ContentPanel] Removed position for {key} from pool_b_positions"
-                )
+        pool = self._get_position_pool()
+        if pool is not None:
+            pool_name = "pool_a_positions" if self.current_team_source == "Team A" else "pool_b_positions"
+            pool.pop(key, None)
+            print(
+                f"[ContentPanel] Removed position for {key} from {pool_name}"
+            )
