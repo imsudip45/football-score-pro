@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, Signal, QPointF
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -312,6 +312,17 @@ class MatchSetupTab(QWidget):
                 "pool_b_formation": getattr(
                     self, "pool_b_formation", "Select Formation"
                 ),
+                # Serialize player position pools (QPointF -> simple dict)
+                "pool_a_positions": {
+                    key: {"x": pos.x(), "y": pos.y()}
+                    for key, pos in getattr(self, "pool_a_positions", {}).items()
+                    if hasattr(pos, "x") and hasattr(pos, "y")
+                },
+                "pool_b_positions": {
+                    key: {"x": pos.x(), "y": pos.y()}
+                    for key, pos in getattr(self, "pool_b_positions", {}).items()
+                    if hasattr(pos, "x") and hasattr(pos, "y")
+                },
             }
             return state
         except Exception as exc:
@@ -344,6 +355,30 @@ class MatchSetupTab(QWidget):
             self.pool_b_formation = pool_state.get(
                 "pool_b_formation", self.pool_b_formation
             )
+
+            # Restore player position pools if present
+            a_positions_serialized = pool_state.get("pool_a_positions")
+            if isinstance(a_positions_serialized, dict):
+                self.pool_a_positions.clear()
+                for key, coord in a_positions_serialized.items():
+                    try:
+                        x = float(coord.get("x"))
+                        y = float(coord.get("y"))
+                    except (TypeError, ValueError, AttributeError):
+                        continue
+                    self.pool_a_positions[key] = QPointF(x, y)
+
+            b_positions_serialized = pool_state.get("pool_b_positions")
+            if isinstance(b_positions_serialized, dict):
+                self.pool_b_positions.clear()
+                for key, coord in b_positions_serialized.items():
+                    try:
+                        x = float(coord.get("x"))
+                        y = float(coord.get("y"))
+                    except (TypeError, ValueError, AttributeError):
+                        continue
+                    self.pool_b_positions[key] = QPointF(x, y)
+
             if "home_panel_state" in state and hasattr(self, "home_team_panel"):
                 self.home_team_panel.load_state(state["home_panel_state"])
             if "away_panel_state" in state and hasattr(self, "away_team_panel"):
