@@ -428,8 +428,12 @@ class FootballScoreProApp:
             }
 
             result = match_service.create_match(match_data)
-            if result.success and result.created_id:
-                print(f"Match created: {result.created_id}")
+            if result.success:
+                # Match was created successfully; created_id may or may not be present
+                if result.created_id:
+                    print(f"Match created: {result.created_id}")
+                else:
+                    print("Match created successfully (no ID returned)")
 
                 # Demo 4: Assign officials
                 print("\nDemo 4: Assigning Officials")
@@ -441,13 +445,16 @@ class FootballScoreProApp:
                     "var_referee": "Paul Tierney",
                 }
 
-                officials_result = match_service.assign_officials(
-                    result.created_id, officials
-                )
-                if officials_result.success:
-                    print("Officials assigned successfully")
+                if result.created_id:
+                    officials_result = match_service.assign_officials(
+                        result.created_id, officials
+                    )
+                    if officials_result.success:
+                        print("Officials assigned successfully")
+                    else:
+                        print(f"Officials assignment failed: {officials_result.errors}")
                 else:
-                    print(f"Officials assignment failed: {officials_result.errors}")
+                    print("Skipping officials assignment: no match ID available")
 
             else:
                 print(f"Match creation failed: {result.errors}")

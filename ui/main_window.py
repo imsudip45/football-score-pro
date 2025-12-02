@@ -1128,11 +1128,15 @@ class MainWindow(QMainWindow):
             )
             return
 
-        # Check if match is created
-        if hasattr(self, "play_on_tab") and hasattr(self.play_on_tab, "match_created"):
-            if not self.play_on_tab.match_created:
-                QMessageBox.information(self, "No Match", "No active match to end.")
-                return
+        # Check if match is created; if the play_on_tab or flag is missing, treat as no active match
+        if not hasattr(self, "play_on_tab") or not hasattr(
+            self.play_on_tab, "match_created"
+        ):
+            QMessageBox.information(self, "No Match", "No active match to end.")
+            return
+        if not self.play_on_tab.match_created:
+            QMessageBox.information(self, "No Match", "No active match to end.")
+            return
 
         # Check if timer has been stopped
         if hasattr(self, "play_on_tab") and hasattr(self.play_on_tab, "timer_running"):
