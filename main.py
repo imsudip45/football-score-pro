@@ -210,7 +210,7 @@ class FootballScoreProApp:
 
     def initialize(self):
         """Initialize the application"""
-        print("Starting Football Score Pro 2.0...")
+        print("Starting Football Score Pro(alpha)")
 
         # Initialize service container
         self.container.initialize()
