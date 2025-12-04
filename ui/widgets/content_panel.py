@@ -288,9 +288,10 @@ class PlayerMarker(QGraphicsItem):
             else:
                 pos = self.pos()
                 player_name = self.content_panel._get_player_name(self.player)
-                print(
-                    f"[PlayerMarker] Saving position for {player_name} (key: {key}) to ({pos.x():.1f}, {pos.y():.1f})"
-                )
+
+            print(
+                f"[PlayerMarker] Saving position for {player_name} (key: {key}) to ({pos.x():.1f}, {pos.y():.1f})"
+            )
             self.content_panel._save_position_to_global_pool(key, pos)
         else:
             print(
@@ -641,26 +642,42 @@ class ContentPanel(QWidget):
                     f"[DEBUG] Pool has {global_pool_size} positions and players not manually positioned - NOT overwriting with screen positions"
                 )
 
+            # Remove positions for players that were previously selected but are now unchecked,
+            # so that when they are checked again they are treated as NEW players and assigned
+            # fresh formation slots instead of reusing stale pool positions.
+            try:
+                if self.selected_players and self.current_team_source == old_team_source:
+                    old_keys = {
+                        self._player_key(p, old_team_source)
+                        for p in (self.selected_players or [])
+                        if p is not None
+                    }
+                    new_keys = set(new_players_by_key.keys())
+                    deselected_keys = old_keys - new_keys
+                    if deselected_keys:
+                        print(
+                            f"[ContentPanel {self.team_name}] Removing {len(deselected_keys)} deselected players from pool"
+                        )
+                        for key in deselected_keys:
+                            self._remove_position_from_global_pool(key)
+            except Exception as e:
+                print(f"[ContentPanel] Error while removing deselected players from pool: {e}")
+
             # Clear all existing markers
             self._clear_all_markers()
 
-            # Remove positions for players no longer in the new selection
-            # BUT: Only remove if we have a non-empty selection - preserve pool if 0 players selected
-            if pool and len(players) > 0:
-                keys_to_remove = [key for key in pool.keys() if key not in new_players_by_key]
-                for key in keys_to_remove:
-                    pool.pop(key, None)
-                    print(
-                        f"[ContentPanel {self.team_name}] Removed deselected player from pool: {key}"
-                    )
-            elif len(players) == 0:
+            if len(players) == 0:
                 print(
-                    f"[ContentPanel {self.team_name}] 0 players selected - preserving all positions in pool (not removing)"
+                    f"[ContentPanel {self.team_name}] 0 players selected - preserving all positions in pool"
                 )
 
             # CRITICAL: If formation was just changed, create markers at center first, then apply formation
             # This ensures new formation positions are used, not old positions from pool
-            if self._formation_just_changed and len(players) == 11 and self.formation != "Select Formation":
+            if (
+                self._formation_just_changed
+                and len(players) == 11
+                and self.formation != "Select Formation"
+            ):
                 print(
                     f"[ContentPanel] Formation was just changed - creating markers at center, then applying new formation {self.formation}"
                 )
@@ -730,48 +747,33 @@ class ContentPanel(QWidget):
                 self.clear_field()
                 return
 
-            # SIMPLIFIED LOGIC: Only apply formation if global pool is empty (first time)
-            # AND players haven't been manually positioned
-            # Otherwise, positions are already loaded from pool above
-            if len(players) == 11 and self.formation != "Select Formation":
-                if global_pool_size == 0 and not self.players_manually_positioned:
-                    # First time - apply formation and save to pool
+            # Formation-aware behavior after rebuilding markers:
+            # - First time (no pool entries yet): apply full formation to all players.
+            # - Later: for players that ALREADY have saved positions, keep those;
+            #          for players WITHOUT saved positions, assign them to free
+            #          formation slots only (do not reshuffle existing players).
+            if len(players) > 0 and self.formation != "Select Formation":
+                pool = self._get_position_pool() or {}
+
+                if len(pool) == 0:
                     print(
-                        f"[ContentPanel] Global pool empty and no manual positioning - applying formation {self.formation}"
+                        f"[ContentPanel] Global pool empty - applying full formation {self.formation} for current selection"
                     )
                     self.apply_formation_to_players(self.formation)
-                elif global_pool_size > 0 and not self.players_manually_positioned:
-                    # Check if all positions in pool are center (meaningful positions should be different)
-                    # If all are center, it means pool was populated before formation was applied
-                    # In this case, we should apply formation to get proper positions
-                    all_center = True
-                    if pool:
-                        center_x, center_y = self._get_scene_center()
-                        for pos in pool.values():
-                            if abs(pos.x() - center_x) > 10 or abs(pos.y() - center_y) > 10:
-                                all_center = False
-                                break
-                    
-                    if all_center:
-                        # All positions are center - apply formation to get proper positions
+                else:
+                    # Determine which selected players do NOT yet have a saved position
+                    missing_players: List[Dict[str, Any]] = []
+                    for p in players:
+                        key = self._player_key(p)
+                        if key not in pool:
+                            missing_players.append(p)
+
+                    if missing_players:
                         print(
-                            f"[ContentPanel] All positions in pool are center - applying formation {self.formation} to get proper positions"
+                            f"[ContentPanel] Assigning formation slots only for "
+                            f"{len(missing_players)} newly-selected players under formation {self.formation}"
                         )
-                        self.apply_formation_to_players(self.formation)
-                    else:
-                        # Positions already loaded from pool - don't apply formation
-                        print(
-                            f"[ContentPanel] Loaded {global_pool_size} positions from global pool - skipping formation (preserving swapped positions)"
-                        )
-                elif self.players_manually_positioned:
-                    # Players have been manually positioned - don't apply formation
-                    print(
-                        f"[ContentPanel] Players manually positioned - skipping formation to preserve swapped positions"
-                    )
-            else:
-                print(
-                    f"[ContentPanel] Showing {len(players)} players without formation (formation={self.formation})"
-                )
+                        self._assign_formation_to_new_players(missing_players)
 
         except Exception as e:
             print(f"[ContentPanel] Error in update_selected_players: {e}")
@@ -787,6 +789,10 @@ class ContentPanel(QWidget):
             marker.team_color = color
             marker._invalidate_cache()
             marker.update()
+
+    def set_coordinate_display(self, show: bool):
+        """Compatibility wrapper used by TeamPanel to set coordinate visibility."""
+        self.toggle_coordinate_display(show)
 
     def toggle_coordinate_display(self, show: Optional[bool] = None):
         """Toggle coordinate display for all player markers"""
@@ -1003,7 +1009,7 @@ class ContentPanel(QWidget):
                 if best is not None:
                     assignments.append((m, best))
                     available.pop(best_idx)
-            
+
             # If there are remaining positions and unassigned markers, assign them
             if available and len(assignments) < len(outfield_markers):
                 unassigned_markers = [m for m in outfield_markers if m not in [a[0] for a in assignments]]
@@ -1040,7 +1046,7 @@ class ContentPanel(QWidget):
                     # Fallback to center if marker not found - but log it for debugging
                     print(f"[WARNING] Could not find position for player {self._get_player_name(player)} (ID: {player.get('id', 'N/A')}, Jersey: {self._get_jersey_number(player)})")
                     final_centers.append((int(center_x), int(center_y)))
-            
+
             # Fill any missing with true center
             while len(final_centers) < sel_count:
                 final_centers.append((int(center_x), int(center_y)))
@@ -1049,6 +1055,136 @@ class ContentPanel(QWidget):
             self.save_formation_state()
         except Exception as e:
             print(f"Error in apply_formation_to_players: {e}")
+
+    def _assign_formation_to_new_players(self, new_players: List[Dict[str, Any]]):
+        """Assign formation slots ONLY to players that don't yet have saved positions.
+
+        Existing players keep their saved positions from the global pool. We compute
+        formation slots using the SAME center-relative grid as apply_formation_to_players
+        so new players line up with the existing formation layout.
+        """
+        try:
+            if not new_players or self.formation == "Select Formation":
+                return
+
+            # Rebuild the center-relative formation grid (same logic as in apply_formation_to_players)
+            try:
+                layers = [int(n) for n in self.formation.split("-")]
+            except Exception:
+                print(f"[ContentPanel] _assign_formation_to_new_players: invalid formation {self.formation}")
+                return
+
+            total_layers = 1 + len(layers)
+            if total_layers < 2:
+                return
+
+            center_x, center_y = self._get_scene_center()
+
+            # Build relative positions: index 0 is GK (0, -300), rest are outfield
+            rel_positions = [(0, -300)]  # GK
+            y_step = 750 / total_layers
+            y_positions = [-350 + (i + 1) * y_step for i in range(len(layers))]
+            max_players = max(layers) if layers else 1
+            spacing = 700 / (max_players - 1) if max_players > 1 else 0
+
+            for layer_idx, num_players in enumerate(layers):
+                y = y_positions[layer_idx]
+                if num_players <= 0:
+                    continue
+                if num_players == 1:
+                    xs = [0]
+                else:
+                    if num_players % 2 == 1:
+                        mid = num_players // 2
+                        xs = [0.0] * num_players
+                        for i in range(mid):
+                            xs[mid - (i + 1)] = int(-(i + 1) * spacing)
+                            xs[mid + (i + 1)] = int((i + 1) * spacing)
+                    else:
+                        start_x = -(num_players - 1) * spacing / 2
+                        xs = [start_x + i * spacing for i in range(num_players)]
+                for x in xs:
+                    rel_positions.append((int(x), int(y)))
+
+            # Convert relative positions to absolute QPointF positions
+            abs_positions: List[QPointF] = []
+            for rx, ry in rel_positions:
+                ry = -ry
+                cx = center_x + rx
+                cy = center_y + ry
+                abs_positions.append(QPointF(cx, cy))
+
+            if not abs_positions:
+                return
+
+            gk_abs_pos = abs_positions[0]
+            outfield_abs_positions = abs_positions[1:] if len(abs_positions) > 1 else []
+
+            # Track which formation slots are already effectively used by players
+            used_indices = set()
+
+            # Helper to find closest outfield slot index for a given QPointF
+            def _closest_index(target: QPointF, candidates: List[QPointF]) -> int:
+                best_idx = -1
+                best_dist = float("inf")
+                for idx, pos in enumerate(candidates):
+                    dist = sqrt((target.x() - pos.x()) ** 2 + (target.y() - pos.y()) ** 2)
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_idx = idx
+                return best_idx
+
+            # Mark slots used by players that already have saved positions
+            for p in self.selected_players:
+                key = self._player_key(p)
+                saved_pos = self._get_position_from_global_pool(key)
+                if not saved_pos:
+                    continue
+
+                if self._is_primary_goalkeeper_player(p):
+                    # Reserve GK slot index 0
+                    used_indices.add(0)
+                else:
+                    if outfield_abs_positions:
+                        idx = _closest_index(saved_pos, outfield_abs_positions)
+                        if idx >= 0:
+                            # shift by 1 because 0 is GK
+                            used_indices.add(idx + 1)
+
+            # Assign free formation slots to new players
+            for p in new_players:
+                key = self._player_key(p)
+                marker = self._match_player_to_marker(p)
+                if not marker:
+                    continue
+
+                if self._is_primary_goalkeeper_player(p):
+                    target_pos = gk_abs_pos
+                    used_indices.add(0)
+                else:
+                    chosen_index = -1
+                    # search only outfield indices (1..len(abs_positions)-1)
+                    for idx in range(1, len(abs_positions)):
+                        if idx not in used_indices:
+                            chosen_index = idx
+                            break
+
+                    if chosen_index == -1:
+                        # No free formation slot; keep current marker position
+                        continue
+
+                    used_indices.add(chosen_index)
+                    target_pos = abs_positions[chosen_index]
+
+                marker.setPos(target_pos)
+                marker.position = QPointF(target_pos)
+                marker._original_position = QPointF(target_pos)
+                self._save_position_to_global_pool(key, target_pos)
+
+            if self.scene:
+                self.scene.update()
+        except Exception as e:
+            print(f"[ContentPanel] Error in _assign_formation_to_new_players: {e}")
 
     def update_player_markers_with_positions(self, positions: List[tuple]):
         """Update player markers with calculated positions"""
@@ -1108,22 +1244,19 @@ class ContentPanel(QWidget):
                         f"[ContentPanel {self.team_name}] FORCING goalkeeper {self._get_player_name(player)} to GK position ({position.x():.1f}, {position.y():.1f})"
                     )
                 else:
-                    # For outfield players, use positions from outfield_positions list
-                    if outfield_pos_idx < len(outfield_positions):
+                    # For outfield players, use saved pool position if it exists;
+                    # otherwise use the next available formation outfield slot.
+                    player_key = self._player_key(player)
+                    saved_pos = self._get_position_from_global_pool(player_key)
+
+                    if saved_pos:
+                        position = saved_pos
+                        print(
+                            f"[ContentPanel {self.team_name}] Using saved position for {self._get_player_name(player)} at ({position.x():.1f}, {position.y():.1f})"
+                        )
+                    elif outfield_pos_idx < len(outfield_positions):
                         x, y = outfield_positions[outfield_pos_idx]
-                        # Check if this player has a manually saved position in the global pool
-                        player_key = self._player_key(player)
-                        saved_pos = self._get_position_from_global_pool(player_key)
-                        
-                        if saved_pos and self.players_manually_positioned:
-                            # Use saved position (from swap) instead of formation position
-                            position = saved_pos
-                            print(
-                                f"[ContentPanel {self.team_name}] Preserving manually positioned player {self._get_player_name(player)} at ({position.x():.1f}, {position.y():.1f})"
-                            )
-                        else:
-                            # Use formation position
-                            position = QPointF(x, y)
+                        position = QPointF(x, y)
                         outfield_pos_idx += 1
                     else:
                         # Fallback to center if not enough positions

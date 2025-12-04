@@ -449,12 +449,10 @@ class FootballScoreProApp:
                     officials_result = match_service.assign_officials(
                         result.created_id, officials
                     )
-                    if officials_result.success:
-                        print("Officials assigned successfully")
-                    else:
-                        print(f"Officials assignment failed: {officials_result.errors}")
+                if officials_result.success:
+                    print("Officials assigned successfully")
                 else:
-                    print("Skipping officials assignment: no match ID available")
+                    print(f"Officials assignment failed: {officials_result.errors}")
 
             else:
                 print(f"Match creation failed: {result.errors}")

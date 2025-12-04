@@ -209,7 +209,7 @@ class _PossessionMixin:
 
 class ModernButton(QPushButton):
     """Custom modern button with hover effects (exact from Play_On_V007.py)"""
-
+    
     def __init__(self, text="", style_type="primary", parent=None, font_size=13):
         super().__init__(text, parent)
         self.style_type = style_type
@@ -226,7 +226,7 @@ class ModernButton(QPushButton):
             self.setStyleSheet(stylesheet)
         else:
             self.apply_style()
-
+    
     def apply_style(self):
         # If custom stylesheet is set, don't override it
         if self._custom_stylesheet:
@@ -300,13 +300,13 @@ class ModernButton(QPushButton):
 
 class ModernLabel(QLabel):
     """Custom modern label with typography styles (exact from Play_On_V007.py)"""
-
+    
     def __init__(self, text="", label_type="body", parent=None, font_size=13):
         super().__init__(text, parent)
         self.label_type = label_type
         self.font_size = font_size
         self.apply_style()
-
+    
     def apply_style(self):
         styles = {
             "heading": f"""
@@ -532,7 +532,7 @@ class ScorerPanel(QWidget):
         self.title = title
         self.parent_tab = parent
         self.previous_goal_count = 0  # Track previous goal count
-
+        
         # Ensure styled background and match MATCH STATISTICS panel
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet("""
@@ -541,7 +541,7 @@ class ScorerPanel(QWidget):
             border: 2px solid #404040;
 
         """)
-
+        
         # Title label with deploy button inside its boundary
         self.title_label = QLabel(title, self)
         self.title_label.setGeometry(10, 10, width - 20, 30)  # Full width title bar
@@ -555,7 +555,7 @@ class ScorerPanel(QWidget):
                 border-radius: 4px;
             }
         """)
-
+        
         # Deploy button inside the title label boundary (left side)
         self.deploy_button = QPushButton("DEPLOY", self.title_label)
         self.deploy_button.setGeometry(520, 4, 75, 22)
@@ -580,7 +580,7 @@ class ScorerPanel(QWidget):
             }
         """)
         self.deploy_button.clicked.connect(self.deploy_selected_scorers)
-
+        
         # Scorer table
         self.scorer_table = QTableWidget(self)
         self.scorer_table.setGeometry(10, 50, width - 20, height - 60)
@@ -617,14 +617,14 @@ class ScorerPanel(QWidget):
         scorer_header = self.scorer_table.horizontalHeader()
         scorer_header.setSectionResizeMode(QHeaderView.Fixed)
         scorer_header.setStretchLastSection(False)
-
+        
         self.scorer_table.setColumnWidth(0, 85)  # Time
         self.scorer_table.setColumnWidth(1, 65)  # Num
         self.scorer_table.setColumnWidth(2, 289)  # Name (wider to fill space)
         self.scorer_table.setColumnWidth(3, 70)  # Export
         self.scorer_table.setColumnWidth(4, 50)  # Lock
         self.scorer_table.setColumnWidth(5, 50)  # Reset
-
+            
         self.scorer_table.verticalHeader().setVisible(False)
         self.scorer_table.setEditTriggers(
             QTableWidget.EditTrigger.DoubleClicked
@@ -636,11 +636,11 @@ class ScorerPanel(QWidget):
         # Disable selection highlighting
         self.scorer_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         self.scorer_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-
+        
         # Set custom delegate for time column to maintain font size during editing
         time_delegate = TimeColumnDelegate()
         self.scorer_table.setItemDelegateForColumn(0, time_delegate)
-
+        
         # Set custom header labels to match cards panel styling
         scorer_header_labels = ["Time", "Num", "Name", "Export", "Lock", "Reset"]
         for col, label in enumerate(scorer_header_labels):
@@ -649,7 +649,7 @@ class ScorerPanel(QWidget):
             item.setForeground(QColor(CONFIG["colors"]["text"]))
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.scorer_table.setHorizontalHeaderItem(col, item)
-
+        
         # Connect header click to toggle all checkboxes in Export and Lock columns
         self.scorer_table.horizontalHeader().sectionClicked.connect(
             lambda col: self._on_scorer_header_clicked(col)
@@ -781,7 +781,7 @@ class ScorerPanel(QWidget):
             self.previous_goal_count = len(rows or [])
         except Exception as exc:
             print(f"Error loading scorer rows: {exc}")
-
+        
     def _initialize_table(self):
         """Initialize the scorer table with proper structure from Play_On.py"""
         team_type = "home" if "HOME" in self.title else "away"
@@ -794,7 +794,7 @@ class ScorerPanel(QWidget):
                 self.scorer_table.setRowCount(30)
         except Exception:
             pass
-
+        
         for row in range(30):  # Initialize all 30 rows
             # Time column - make editable
             time_item = QTableWidgetItem("00:00")
@@ -962,60 +962,14 @@ class ScorerPanel(QWidget):
                     "Please create a match in the Match Setup tab first before selecting players.",
                 )
                 return
-            # Get team data from parent tab
-            team_data = None
-            if hasattr(self, "parent_tab") and self.parent_tab:
-                if team_type == "home":
-                    team_data = getattr(self.parent_tab, "home_team_data", None)
-                else:
-                    team_data = getattr(self.parent_tab, "away_team_data", None)
-
-            # If no team data, show warning
-            if not team_data or not isinstance(team_data, dict):
-                from PySide6.QtWidgets import QMessageBox
-
-                team_label = "Home Team" if team_type == "home" else "Away Team"
-                QMessageBox.warning(
-                    None,
-                    "No Players",
-                    f"No players loaded for {team_label}. Please create a match first.",
-                )
-                return
-
-            # Get playing 11 players (dynamic list that updates with substitutions)
-            players = team_data.get("playing_11", [])
-            if not players:
-                # Fallback: check selected flag in players array
-                all_players = team_data.get("players", [])
-                players = [p for p in all_players if p.get("selected", False)]
-
-            team_label = "Home Team" if team_type == "home" else "Away Team"
-
-            if not players:
-                from PySide6.QtWidgets import QMessageBox
-
-                QMessageBox.warning(
-                    None,
-                    "No Players",
-                    f"No playing 11 players available for {team_label}. Please ensure 11 players are selected in Match Setup.",
-                )
-                return
-
-            sent_off_set = set()
-            try:
-                if hasattr(self.parent_tab, "sent_off_players"):
-                    normalized_team = (
-                        "home" if str(team_type).lower().startswith("home") else "away"
-                    )
-                    sent_off_set = self.parent_tab.sent_off_players.get(
-                        normalized_team, set()
-                    )
-            except Exception:
-                sent_off_set = set()
-
+            # Base team for this scorer row (home/away); used to determine OWN vs OPP side.
+            base_team_type = "home" if str(team_type).lower().startswith("home") else "away"
+            
             # Show player selection dialog (UI matches old app)
             dialog = QDialog(self)
-            dialog.setWindowTitle(f"Select Player for {team_label}")
+            dialog.setWindowTitle(
+                f"Select Player for {'Home Team' if base_team_type == 'home' else 'Away Team'}"
+            )
             dialog.setStyleSheet("""
                 QDialog {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -1024,18 +978,40 @@ class ScorerPanel(QWidget):
                 }
             """)
             dialog.setFixedSize(620, 600)  # Wider to accommodate scoring method columns
-
+            
             layout = QVBoxLayout(dialog)
-
+            
             # Maintain checkbox references per row to enforce single selection
             checkbox_groups = {}
+            
+            # Create top bar with Own Goal toggle (top-right)
+            top_bar = QHBoxLayout()
+            top_bar.addStretch()
+            own_goal_toggle = QCheckBox("Own Goal")
+            own_goal_toggle.setStyleSheet("""
+                QCheckBox {
+                    font-weight: bold;
+                    border: none;
+                    background: transparent;
+                }
+                QCheckBox::indicator {
+                    width: 18px;
+                    height: 18px;
+                    border-radius: 9px;
+                    border: 1px solid #4b5563;
+                    background: #111827;
+                }
+                QCheckBox::indicator:checked {
+                    background: #ef4444;
+                    border: 1px solid #b91c1c;
+                    border-radius: 9px;
+                }
+            """)
+            top_bar.addWidget(own_goal_toggle)
+            layout.addLayout(top_bar)
 
-            # Create player table (now includes scoring method columns)
+            # Create player table (columns will depend on Own Goal toggle)
             player_table = QTableWidget(dialog)
-            player_table.setColumnCount(5)
-            player_table.setHorizontalHeaderLabels(
-                ["Player Name", "Number", "Foot", "Head", "Penalty"]
-            )
             player_table.setStyleSheet("""
                 QTableWidget {
                     background: transparent;
@@ -1065,48 +1041,30 @@ class ScorerPanel(QWidget):
                     font-weight: bold;
                 }
             """)
-
+            
             header = player_table.horizontalHeader()
-            header.setSectionResizeMode(0, QHeaderView.Stretch)
-            header.setSectionResizeMode(1, QHeaderView.Fixed)
-            header.setSectionResizeMode(2, QHeaderView.Fixed)
-            header.setSectionResizeMode(3, QHeaderView.Fixed)
-            header.setSectionResizeMode(4, QHeaderView.Fixed)
-            player_table.setColumnWidth(1, 80)
-            for idx in (2, 3, 4):
-                player_table.setColumnWidth(idx, 70)
-
+            
             player_table.verticalHeader().setVisible(False)
             player_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
             player_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
             player_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
 
             # Store widget and checkbox references for selection highlighting
-            checkbox_widgets = {}  # row -> list of widgets for columns 2, 3, 4
-            checkbox_controls = {}  # row -> list of checkboxes (foot, head, penalty)
+            checkbox_widgets = {}  # row -> list of widgets for columns 2, 3, 4, 5
+            checkbox_controls = {}  # row -> list of checkboxes (foot, head, penalty, freekick)
+            sent_off_set = set()
 
-            # Sort by jersey number like old app
-            try:
-
-                def get_jersey_num(player):
-                    jersey = (
-                        player.get("jersey_number") or player.get("jersey_no") or "0"
-                    )
-                    try:
-                        return int(jersey)
-                    except (ValueError, TypeError):
-                        return 0
-
-                players = sorted(players, key=get_jersey_num)
-            except Exception as e:
-                print(f"Error sorting players: {str(e)}")
-                # If sorting fails, use original order
-
-            player_table.setRowCount(len(players))
-            # Set explicit row height to prevent overflow
-            row_height = 32  # Enough for checkbox (20px) + padding
-            for row in range(len(players)):
-                player_table.setRowHeight(row, row_height)
+            # Helper to convert jersey number safely
+            def get_jersey_num(player):
+                jersey = player.get("jersey_number") or player.get("jersey_no") or "0"
+                try:
+                    return int(jersey)
+                except (ValueError, TypeError):
+                    return 0
+            
+            # Closure state: current visible team and players list
+            current_team_type = base_team_type  # "home" or "away"
+            players = []
 
             def handle_checkbox_state(row_idx, current_key, state):
                 """Allow only a single scoring method per row and prevent all from being unchecked."""
@@ -1131,49 +1089,145 @@ class ScorerPanel(QWidget):
                             current_checkbox.setChecked(True)
                             current_checkbox.blockSignals(False)
 
-            for i, player in enumerate(players):
-                # Player name
-                name_item = QTableWidgetItem(player.get("full_name", "Unknown"))
-                name_item.setData(Qt.ItemDataRole.UserRole, player)
-                name_item.setTextAlignment(
-                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-                )
-                player_table.setItem(i, 0, name_item)
+            def populate_table_for_team(team_side: str, initial: bool = False) -> bool:
+                """Populate player_table and state for the given team side ('home' or 'away')."""
+                nonlocal current_team_type, players, sent_off_set
 
-                # Jersey number (handle both jersey_number and jersey_no)
-                jersey_num = (
-                    player.get("jersey_number") or player.get("jersey_no") or ""
-                )
-                jersey_item = QTableWidgetItem(str(jersey_num))
-                jersey_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                player_table.setItem(i, 1, jersey_item)
+                team_side = "home" if str(team_side).lower().startswith("home") else "away"
+                team_label = "Home Team" if team_side == "home" else "Away Team"
 
-                if str(jersey_num) in sent_off_set:
-                    color = QColor("#ff4d4f")
-                    name_item.setForeground(color)
-                    jersey_item.setForeground(color)
-                    name_item.setFlags(Qt.ItemFlag.NoItemFlags)
-                    jersey_item.setFlags(Qt.ItemFlag.NoItemFlags)
-                    tooltip = "Red card — player is no longer available."
-                    name_item.setToolTip(tooltip)
-                    jersey_item.setToolTip(tooltip)
+                # Get team data from parent tab
+                team_data = None
+                if hasattr(self, "parent_tab") and self.parent_tab:
+                    if team_side == "home":
+                        team_data = getattr(self.parent_tab, "home_team_data", None)
+                    else:
+                        team_data = getattr(self.parent_tab, "away_team_data", None)
+
+                if not team_data or not isinstance(team_data, dict):
+                    QMessageBox.warning(
+                        None,
+                        "No Players",
+                        f"No players loaded for {team_label}. Please create a match first.",
+                    )
+                    if initial:
+                        dialog.reject()
+                    return False
+
+                # Get playing 11 players (dynamic list that updates with substitutions)
+                players_local = team_data.get("playing_11", [])
+                if not players_local:
+                    # Fallback: check selected flag in players array
+                    all_players = team_data.get("players", [])
+                    players_local = [p for p in all_players if p.get("selected", False)]
+
+                if not players_local:
+                    QMessageBox.warning(
+                        None,
+                        "No Players",
+                        f"No playing 11 players available for {team_label}. Please ensure 11 players are selected in Match Setup.",
+                    )
+                    if initial:
+                        dialog.reject()
+                    return False
+
+                try:
+                    players_sorted = sorted(players_local, key=get_jersey_num)
+                except Exception as e:
+                    print(f"Error sorting players: {str(e)}")
+                    players_sorted = list(players_local)
+
+                # Update closure state
+                players = players_sorted
+                current_team_type = team_side
+
+                # Update dialog title and table columns to reflect team and own-goal state
+                is_own_goal = own_goal_toggle.isChecked()
+                if is_own_goal:
+                    dialog.setWindowTitle(f"Select Player for {team_label} (Own Goal)")
+                    # Only show Player Name + Number columns
+                    player_table.setColumnCount(2)
+                    player_table.setHorizontalHeaderLabels(["Player Name", "Number"])
+                    header.setSectionResizeMode(0, QHeaderView.Stretch)
+                    header.setSectionResizeMode(1, QHeaderView.Fixed)
+                    player_table.setColumnWidth(1, 80)
                 else:
-                    # Check if player has yellow card
-                    yellow_card_set = set()
-                    try:
-                        if hasattr(self.parent_tab, "yellow_card_players"):
-                            normalized_team = (
-                                "home"
-                                if str(team_type).lower().startswith("home")
-                                else "away"
-                            )
-                            yellow_card_set = self.parent_tab.yellow_card_players.get(
-                                normalized_team, set()
-                            )
-                    except Exception:
-                        yellow_card_set = set()
+                    dialog.setWindowTitle(f"Select Player for {team_label}")
+                    # Full columns including scoring methods
+                    player_table.setColumnCount(6)
+                    player_table.setHorizontalHeaderLabels(
+                        ["Player Name", "Number", "Foot", "Head", "Penalty", "Free Kick"]
+                    )
+                    header.setSectionResizeMode(0, QHeaderView.Stretch)
+                    header.setSectionResizeMode(1, QHeaderView.Fixed)
+                    header.setSectionResizeMode(2, QHeaderView.Fixed)
+                    header.setSectionResizeMode(3, QHeaderView.Fixed)
+                    header.setSectionResizeMode(4, QHeaderView.Fixed)
+                    header.setSectionResizeMode(5, QHeaderView.Fixed)
+                    player_table.setColumnWidth(1, 80)
+                    for idx in (2, 3, 4, 5):
+                        player_table.setColumnWidth(idx, 70)
 
-                    if str(jersey_num) in yellow_card_set:
+                # Compute sent-off and yellow-card sets for this team
+                sent_off_set = set()
+                try:
+                    if hasattr(self.parent_tab, "sent_off_players"):
+                        normalized_team = team_side
+                        sent_off_set = self.parent_tab.sent_off_players.get(
+                            normalized_team, set()
+                        )
+                except Exception:
+                    sent_off_set = set()
+
+                yellow_card_set = set()
+                try:
+                    if hasattr(self.parent_tab, "yellow_card_players"):
+                        normalized_team = team_side
+                        yellow_card_set = self.parent_tab.yellow_card_players.get(
+                            normalized_team, set()
+                        )
+                except Exception:
+                    yellow_card_set = set()
+
+                # Reset table and helper state
+                checkbox_groups.clear()
+                checkbox_widgets.clear()
+                checkbox_controls.clear()
+
+                player_table.clearContents()
+                player_table.setRowCount(len(players_sorted))
+
+                row_height = 32  # Enough for checkbox (20px) + padding
+                for row_idx in range(len(players_sorted)):
+                    player_table.setRowHeight(row_idx, row_height)
+
+                for i, player in enumerate(players_sorted):
+                    # Player name
+                    name_item = QTableWidgetItem(player.get("full_name", "Unknown"))
+                    name_item.setData(Qt.ItemDataRole.UserRole, player)
+                    name_item.setTextAlignment(
+                        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    player_table.setItem(i, 0, name_item)
+
+                    # Jersey number (handle both jersey_number and jersey_no)
+                    jersey_num = (
+                        player.get("jersey_number") or player.get("jersey_no") or ""
+                    )
+                    jersey_item = QTableWidgetItem(str(jersey_num))
+                    jersey_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    player_table.setItem(i, 1, jersey_item)
+
+                    if str(jersey_num) in sent_off_set:
+                        color = QColor("#ff4d4f")
+                        name_item.setForeground(color)
+                        jersey_item.setForeground(color)
+                        name_item.setFlags(Qt.ItemFlag.NoItemFlags)
+                        jersey_item.setFlags(Qt.ItemFlag.NoItemFlags)
+                        tooltip = "Red card — player is no longer available."
+                        name_item.setToolTip(tooltip)
+                        jersey_item.setToolTip(tooltip)
+                    elif str(jersey_num) in yellow_card_set:
                         # Yellow highlight for players with yellow cards
                         color = QColor("#fbbf24")  # Yellow/amber color
                         name_item.setForeground(color)
@@ -1186,82 +1240,109 @@ class ScorerPanel(QWidget):
                         name_item.setToolTip(tooltip)
                         jersey_item.setToolTip(tooltip)
 
-                # Scoring method checkboxes with white checkmark
-                foot_cb = WhiteCheckmarkCheckBox()
-                head_cb = WhiteCheckmarkCheckBox()
-                penalty_cb = WhiteCheckmarkCheckBox()
+                    # For normal goals, build method checkboxes; for own goals, omit them
+                    if not is_own_goal:
+                        # Scoring method checkboxes with white checkmark
+                        foot_cb = WhiteCheckmarkCheckBox()
+                        head_cb = WhiteCheckmarkCheckBox()
+                        penalty_cb = WhiteCheckmarkCheckBox()
+                        freekick_cb = WhiteCheckmarkCheckBox()
 
-                checkbox_groups[i] = {
-                    "foot": foot_cb,
-                    "head": head_cb,
-                    "penalty": penalty_cb,
-                }
-                foot_cb.setChecked(True)
+                        checkbox_groups[i] = {
+                            "foot": foot_cb,
+                            "head": head_cb,
+                            "penalty": penalty_cb,
+                            "freekick": freekick_cb,
+                        }
+                        foot_cb.setChecked(True)
 
-                # Initially disable all checkboxes - they'll be enabled when row is selected
-                foot_cb.setEnabled(False)
-                head_cb.setEnabled(False)
-                penalty_cb.setEnabled(False)
+                        # Initially disable all checkboxes - they'll be enabled when row is selected
+                        foot_cb.setEnabled(False)
+                        head_cb.setEnabled(False)
+                        penalty_cb.setEnabled(False)
+                        freekick_cb.setEnabled(False)
 
-                # Store checkbox references for enabling/disabling
-                checkbox_controls[i] = [foot_cb, head_cb, penalty_cb]
+                        # Store checkbox references for enabling/disabling
+                        checkbox_controls[i] = [foot_cb, head_cb, penalty_cb, freekick_cb]
 
-                def add_checkbox(cb, column_index):
-                    # Create a placeholder item that allows selection (for row highlighting)
-                    placeholder = QTableWidgetItem()
-                    placeholder.setFlags(
-                        Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
-                    )
-                    placeholder.setText("")  # Empty text
-                    player_table.setItem(i, column_index, placeholder)
+                        def add_checkbox(cb, column_index, row_index=i):
+                            # Create a placeholder item that allows selection (for row highlighting)
+                            placeholder = QTableWidgetItem()
+                            placeholder.setFlags(
+                                Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                            )
+                            placeholder.setText("")  # Empty text
+                            player_table.setItem(row_index, column_index, placeholder)
 
-                    widget = QWidget()
-                    widget.setStyleSheet("border: 0px; background: transparent;")
-                    # Store row index for selection
-                    widget.setProperty("row_index", i)
+                            widget = QWidget()
+                            widget.setStyleSheet("border: 0px; background: transparent;")
+                            # Store row index for selection
+                            widget.setProperty("row_index", row_index)
 
-                    # Add mouse event handler to select row when clicking on widget area
-                    def widget_mouse_press(event):
-                        if event.button() == Qt.MouseButton.LeftButton:
-                            # Select the entire row when clicking on widget area
-                            row_idx = widget.property("row_index")
-                            if row_idx is not None:
-                                player_table.selectRow(row_idx)
-                        # Don't accept the event, let it propagate to checkbox if needed
-                        QWidget.mousePressEvent(widget, event)
+                            # Add mouse event handler to select row when clicking on widget area
+                            def widget_mouse_press(event):
+                                if event.button() == Qt.MouseButton.LeftButton:
+                                    # Select the entire row when clicking on widget area
+                                    row_sel = widget.property("row_index")
+                                    if row_sel is not None:
+                                        player_table.selectRow(row_sel)
+                                # Don't accept the event, let it propagate to checkbox if needed
+                                QWidget.mousePressEvent(widget, event)
 
-                    widget.mousePressEvent = widget_mouse_press
+                            widget.mousePressEvent = widget_mouse_press
 
-                    cb_layout = QHBoxLayout(widget)
-                    cb_layout.setContentsMargins(0, 0, 0, 0)  # No margins
-                    cb_layout.setSpacing(0)
-                    # Add stretch before and after to center the checkbox horizontally
-                    cb_layout.addStretch()
-                    cb_layout.addWidget(cb)
-                    cb_layout.addStretch()
-                    # Ensure checkbox receives mouse events
-                    cb.setAttribute(Qt.WA_TransparentForMouseEvents, False)
-                    cb.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-                    player_table.setCellWidget(i, column_index, widget)
+                            cb_layout = QHBoxLayout(widget)
+                            cb_layout.setContentsMargins(0, 0, 0, 0)  # No margins
+                            cb_layout.setSpacing(0)
+                            # Add stretch before and after to center the checkbox horizontally
+                            cb_layout.addStretch()
+                            cb_layout.addWidget(cb)
+                            cb_layout.addStretch()
+                            # Ensure checkbox receives mouse events
+                            cb.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+                            cb.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+                            player_table.setCellWidget(row_index, column_index, widget)
 
-                    # Store widget reference for selection highlighting
-                    if i not in checkbox_widgets:
-                        checkbox_widgets[i] = []
-                    checkbox_widgets[i].append(widget)
+                            # Store widget reference for selection highlighting
+                            if row_index not in checkbox_widgets:
+                                checkbox_widgets[row_index] = []
+                            checkbox_widgets[row_index].append(widget)
 
-                add_checkbox(foot_cb, 2)
-                add_checkbox(head_cb, 3)
-                add_checkbox(penalty_cb, 4)
+                        add_checkbox(foot_cb, 2)
+                        add_checkbox(head_cb, 3)
+                        add_checkbox(penalty_cb, 4)
+                        add_checkbox(freekick_cb, 5)
 
-                for key, checkbox in checkbox_groups[i].items():
-                    checkbox.stateChanged.connect(
-                        lambda state, row_idx=i, current_key=key: handle_checkbox_state(
-                            row_idx, current_key, state
-                        )
-                    )
+                        for key, checkbox in checkbox_groups[i].items():
+                            checkbox.stateChanged.connect(
+                                lambda state, row_idx=i, current_key=key: handle_checkbox_state(
+                                    row_idx, current_key, state
+                                )
+                            )
 
-                # Store player data for retrieval
-                name_item.setData(Qt.ItemDataRole.UserRole, player)
+                    # Store player data for retrieval
+                    name_item.setData(Qt.ItemDataRole.UserRole, player)
+            
+                return True
+
+            # Initially populate with base (own) team
+            if not populate_table_for_team(base_team_type, initial=True):
+                return
+
+            def on_own_goal_toggled(state):
+                """When toggled, show the OPPOSITE team's players for own-goal selection."""
+                desired_team = (
+                    ("away" if base_team_type == "home" else "home")
+                    if state == Qt.CheckState.Checked.value
+                    else base_team_type
+                )
+                if not populate_table_for_team(desired_team, initial=False):
+                    # Revert toggle if loading failed
+                    own_goal_toggle.blockSignals(True)
+                    own_goal_toggle.setChecked(False)
+                    own_goal_toggle.blockSignals(False)
+
+            own_goal_toggle.stateChanged.connect(on_own_goal_toggled)
 
             # Function to update row highlighting based on selection
             def update_row_highlighting():
@@ -1303,10 +1384,10 @@ class ScorerPanel(QWidget):
             player_table.itemSelectionChanged.connect(update_row_highlighting)
 
             layout.addWidget(player_table)
-
+            
             # Buttons (matching official selector dialog)
             button_layout = QHBoxLayout()
-
+            
             # OK button
             ok_button = QPushButton("OK")
             ok_button.setFont(QFont("Verdana", 14))
@@ -1323,7 +1404,7 @@ class ScorerPanel(QWidget):
                     background-color: #45a049;
                 }
             """)
-
+            
             # Cancel button
             cancel_button = QPushButton("Cancel")
             cancel_button.setFont(QFont("Verdana", 14))
@@ -1340,7 +1421,7 @@ class ScorerPanel(QWidget):
                     background-color: #d32f2f;
                 }
             """)
-
+            
             def update_selection():
                 """Handle player selection (logic unchanged)"""
                 selected_rows = player_table.selectedIndexes()
@@ -1352,7 +1433,7 @@ class ScorerPanel(QWidget):
                         "Please select a player before confirming.",
                     )
                     return
-
+                
                 selected_row = selected_rows[0].row()
                 name_item = player_table.item(selected_row, 0)
                 if (
@@ -1376,25 +1457,32 @@ class ScorerPanel(QWidget):
                     player = players[selected_row]
 
                 if isinstance(player, dict):
-                    selected_method = None
-                    row_group = checkbox_groups.get(selected_row, {})
-                    if row_group.get("foot") and row_group["foot"].isChecked():
-                        selected_method = "foot"
-                    elif row_group.get("head") and row_group["head"].isChecked():
-                        selected_method = "head"
-                    elif row_group.get("penalty") and row_group["penalty"].isChecked():
-                        selected_method = "penalty"
+                    # If Own Goal is toggled, we don't use Foot/Head/Penalty/Free Kick;
+                    # method is always recorded as "og".
+                    if own_goal_toggle.isChecked():
+                        selected_method = "og"
+                    else:
+                        selected_method = None
+                        row_group = checkbox_groups.get(selected_row, {})
+                        if row_group.get("foot") and row_group["foot"].isChecked():
+                            selected_method = "foot"
+                        elif row_group.get("head") and row_group["head"].isChecked():
+                            selected_method = "head"
+                        elif row_group.get("penalty") and row_group["penalty"].isChecked():
+                            selected_method = "penalty"
+                        elif row_group.get("freekick") and row_group["freekick"].isChecked():
+                            selected_method = "freekick"
 
-                    if not selected_method:
-                        print(
-                            f"[ScorerDialog] No scoring method selected for row {selected_row}"
-                        )
-                        QMessageBox.warning(
-                            self,
-                            "Select Scoring Method",
-                            "Please choose Foot, Head, or Penalty to describe how the goal was scored.",
-                        )
-                        return
+                        if not selected_method:
+                            print(
+                                f"[ScorerDialog] No scoring method selected for row {selected_row}"
+                            )
+                            QMessageBox.warning(
+                                self,
+                                "Select Scoring Method",
+                                "Please choose Foot, Head, Penalty, or Free Kick to describe how the goal was scored.",
+                            )
+                            return
 
                     print(
                         f"[ScorerDialog] Applying player {player.get('full_name') or player.get('name')} ({player.get('jersey_number') or player.get('jersey_no')}) via {selected_method} to table row {target_row}"
@@ -1409,24 +1497,24 @@ class ScorerPanel(QWidget):
                         "Could not read details for the selected player.",
                     )
                     dialog.reject()
-
+            
             ok_button.clicked.connect(update_selection)
             cancel_button.clicked.connect(dialog.reject)
             player_table.doubleClicked.connect(update_selection)
-
+            
             button_layout.addWidget(ok_button)
             button_layout.addWidget(cancel_button)
             layout.addLayout(button_layout)
-
+            
             # Show dialog
             dialog.exec()
-
+            
         except Exception as e:
             print(f"Error in show_player_list: {e}")
             import traceback
 
             traceback.print_exc()
-
+    
     def set_selected_player(self, row, player, scoring_method=None):
         """Set the selected player in the scorer table along with scoring method"""
         try:
@@ -1456,7 +1544,7 @@ class ScorerPanel(QWidget):
                     name_btn.setToolTip(f"Goal via {method_label}")
                 else:
                     name_btn.setToolTip("")
-
+                
             # Update jersey number (support both jersey_number and jersey_no keys)
             num_item = self.scorer_table.item(row, 1)
             if num_item:
@@ -1467,14 +1555,14 @@ class ScorerPanel(QWidget):
                     or ""
                 )
                 num_item.setText(str(jersey_no))
-
+                
             # Enable Lock checkbox since Num is now non-blank
             lock_widget = self.scorer_table.cellWidget(row, 4)
             if lock_widget:
                 lock_cb = lock_widget.findChild(QCheckBox)
                 if lock_cb:
                     lock_cb.setEnabled(True)
-
+                    
             # Update time
             time_item = self.scorer_table.item(row, 0)
             if (
@@ -1484,9 +1572,9 @@ class ScorerPanel(QWidget):
             ):
                 current_time = self.parent_tab.timer_label.text()
                 time_item.setText(current_time)
-
+                
             self.update_row_visibility()
-
+            
         except Exception as e:
             print(f"Error setting selected player: {e}")
 
@@ -1536,14 +1624,14 @@ class ScorerPanel(QWidget):
                         time_item = self.scorer_table.item(row, 0)
                         num_item = self.scorer_table.item(row, 1)
                         name_widget = self.scorer_table.cellWidget(row, 2)
-
+                        
                         time = time_item.text() if time_item else "00:00"
                         num = num_item.text() if num_item else ""
                         name = name_widget.text() if name_widget else "Select Player"
                         scoring_method = None
                         if name_widget:
                             scoring_method = name_widget.property("scoring_method")
-
+                        
                         selected_rows.append(
                             {
                                 "row": row,
@@ -1553,7 +1641,7 @@ class ScorerPanel(QWidget):
                                 "method": scoring_method,
                             }
                         )
-
+        
         if selected_rows:
             print(
                 f"Deploying {len(selected_rows)} selected scorer(s) from {self.title}:"
@@ -1621,7 +1709,7 @@ class ScorerPanel(QWidget):
         """Enable or disable a row based on Lock checkbox state"""
         try:
             is_locked = state == Qt.CheckState.Checked.value
-
+            
             # Time column (0) - should remain editable when unlocked
             time_item = self.scorer_table.item(row, 0)
             if time_item:
@@ -1719,7 +1807,7 @@ class ScorerPanel(QWidget):
                     goal_count = int(self.parent_tab.home_goal_label.text())
                 else:
                     goal_count = int(self.parent_tab.away_goal_label.text())
-
+                    
                 for row in range(self.scorer_table.rowCount()):
                     if row < goal_count:
                         self.scorer_table.showRow(row)
@@ -1727,7 +1815,7 @@ class ScorerPanel(QWidget):
                         self.scorer_table.hideRow(row)
         except Exception as e:
             print(f"Error in update_row_visibility: {str(e)}")
-
+            
     def update_goals(self, goal_count, current_time):
         """Update goals and show appropriate number of rows"""
         try:
@@ -1738,7 +1826,7 @@ class ScorerPanel(QWidget):
                     self.scorer_table.showRow(row)
                 else:
                     self.scorer_table.hideRow(row)
-
+            
             # If goals increased, update time for new goal rows
             if goal_count > self.previous_goal_count:
                 # Find and update time for the next empty row
@@ -1752,21 +1840,21 @@ class ScorerPanel(QWidget):
                 for row in range(goal_count, min(self.previous_goal_count, total_rows)):
                     self.reset_scorer_row(row, reset_time=True)
                     self.scorer_table.hideRow(row)
-
+            
             # Update previous goal count
             self.previous_goal_count = goal_count
-
+                    
         except Exception as e:
             print(f"Error in update_goals: {str(e)}")
 
 
 class PlayOnTab(QWidget):
     """Exact Play On Tab implementation based on Play_On_V007.py"""
-
+    
     def __init__(self, backend_service: BackendService, parent=None):
         super().__init__(parent)
         self.backend_service = backend_service
-
+        
         # Initialize variables from reference
         self.button_animators = {}
         self.time_type = "Current Time"
@@ -1783,7 +1871,7 @@ class PlayOnTab(QWidget):
         self.away_goals = 0
         # Keep scoreboard side labels static by default
         self.static_top_team_labels = True
-
+        
         # Statistics data storage
         self.stats_data = {
             "home_possession_time": 0,
@@ -1817,7 +1905,7 @@ class PlayOnTab(QWidget):
         self.yellow_card_players = {"home": set(), "away": set()}
         # Track officials with yellow cards
         self.yellow_card_officials = {"home": set(), "away": set()}
-
+        
         # Possession tracking variables (from Play_On.py)
         self.home_ball_control_time = 0  # Seconds
         self.away_ball_control_time = 0  # Seconds
@@ -1825,25 +1913,25 @@ class PlayOnTab(QWidget):
         self._suppress_possession_highlight_once = (
             True  # Skip highlight during kickoff selection
         )
-
+        
         # Team data variables for player selection
         self.home_team_data = None
         self.away_team_data = None
         self.home_selected_rows = []
         self.away_selected_rows = []
-
+        
         # Match creation gate - prevents data loading until match is created
         self.match_created = False
         self.current_match_id = None
-
+        
         # Timer setup
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_timer)
         self.timer.timeout.connect(self.update_possession_times)
-
+        
         # Initialize UI
         self.init_play_on_tab()
-
+        
     def init_play_on_tab(self):
         """Initialize the Play On tab UI with exact reference layout"""
         self.setStyleSheet(f"""
@@ -1893,10 +1981,10 @@ class PlayOnTab(QWidget):
         self._create_extra_timer_panel()
         self._create_stats_panel()
         # Reset button moved to toolbar
-
+        
         # Add scorer panels (positioned above cards panels)
         self.add_scorer_panels()
-
+        
         # Add cards panels (positioned below scorer panels)
         self.add_cards_panels()
 
@@ -2021,7 +2109,7 @@ class PlayOnTab(QWidget):
                 border-radius: 6px;
             }}
         """)
-
+        
         self.away_full_team_name = ModernLabel(
             "Team Full Name", "body", self.away_team_panel, font_size=13
         )
@@ -2068,22 +2156,22 @@ class PlayOnTab(QWidget):
                 return
 
             self.current_match_id = match_data.get("match_id") or match_data.get("id")
-
+            
             home = (match_data or {}).get("home_team") or {}
             away = (match_data or {}).get("away_team") or {}
-
+            
             # Store team data for player selection functionality
             self.home_team_data = home
             self.away_team_data = away
-
+            
             # Update team labels for detail fields only; keep top side labels static if configured
             home_name = home.get("full_name") or home.get("short_name") or "Home Team"
             away_name = away.get("full_name") or away.get("short_name") or "Away Team"
-
+            
             # Get short names for stats panel headers (prefer short_name over full_name)
             home_short_name = home.get("short_name") or home.get("name") or "Home Team"
             away_short_name = away.get("short_name") or away.get("name") or "Away Team"
-
+            
             # Update top large side labels only if not static
             if not getattr(self, "static_top_team_labels", False):
                 if hasattr(self, "home_team_label"):
@@ -2107,7 +2195,7 @@ class PlayOnTab(QWidget):
                     self.stats_away_header_label.setText(away_short_name)
             except Exception as e:
                 print(f"DEBUG: Unable to update stats header labels: {e}")
-
+            
             # Update scorer panel titles with team short names
             try:
                 if hasattr(self, "home_scorer_panel") and hasattr(
@@ -2124,7 +2212,7 @@ class PlayOnTab(QWidget):
                     )
             except Exception as e:
                 print(f"DEBUG: Unable to update scorer panel titles: {e}")
-
+            
             # Update cards panel titles with team short names
             try:
                 if hasattr(self, "home_card_label"):
@@ -2133,32 +2221,32 @@ class PlayOnTab(QWidget):
                     self.away_card_label.setText(f"{away_short_name} CARDS")
             except Exception as e:
                 print(f"DEBUG: Unable to update cards panel titles: {e}")
-
+            
             # Always update the smaller detail labels
             if hasattr(self, "full_team_name"):
                 self.full_team_name.setText(home.get("full_name") or "Team Full Name")
             else:
                 print("DEBUG: full_team_name not found")
-
+                
             if hasattr(self, "short_team_name"):
                 self.short_team_name.setText(home.get("short_name") or "Short Name")
             else:
                 print("DEBUG: short_team_name not found")
-
+                
             if hasattr(self, "away_full_team_name"):
                 self.away_full_team_name.setText(
                     away.get("full_name") or "Team Full Name"
                 )
             else:
                 print("DEBUG: away_full_team_name not found")
-
+                
             if hasattr(self, "away_short_team_name"):
                 self.away_short_team_name.setText(
                     away.get("short_name") or "Short Name"
                 )
             else:
                 print("DEBUG: away_short_team_name not found")
-
+            
             # Update tournament name if available
             if hasattr(self, "tournament_label"):
                 tournament_name = (match_data or {}).get(
@@ -2171,23 +2259,23 @@ class PlayOnTab(QWidget):
                         "name", tournament_data.get("tournament_name", tournament_name)
                     )
                 self.tournament_label.setText(tournament_name)
-
+            
             # Load team logos if available
             self._load_team_logos(match_data)
-
+            
             # Load additional fixture data if available
             self._load_additional_fixture_data(match_data)
-
+            
             print(f"DEBUG: Loaded teams - Home: {home_name}, Away: {away_name}")
             print(f"DEBUG: Home team players: {len(home.get('players', []))}")
             print(f"DEBUG: Away team players: {len(away.get('players', []))}")
-
+            
         except Exception as e:
             print(f"Error loading match data: {e}")
             import traceback
 
             traceback.print_exc()
-
+    
     def _format_seconds(self, seconds: int) -> str:
         try:
             secs = max(int(seconds or 0), 0)
@@ -2435,23 +2523,23 @@ class PlayOnTab(QWidget):
         """Enable match data loading after match is created"""
         self.match_created = True
         print("DEBUG: Match creation gate opened - data loading enabled")
-
+    
     def _load_team_logos(self, match_data: dict):
         """Load team logos into the image widgets"""
         try:
             import os
 
             from PySide6.QtGui import QPixmap
-
+            
             # Get home team logo
             home_team = match_data.get("home_team", {})
             home_logo_path = None
-
+            
             # Debug: Print available keys in home_team
             print(
                 f"DEBUG: Home team keys: {list(home_team.keys()) if isinstance(home_team, dict) else 'Not a dict'}"
             )
-
+            
             # Try multiple logo path sources
             if "logo" in home_team and home_team["logo"]:
                 home_logo_path = home_team["logo"]
@@ -2459,16 +2547,16 @@ class PlayOnTab(QWidget):
                 home_logo_path = home_team["logo_url"]
             elif "home_team_logo" in match_data and match_data["home_team_logo"]:
                 home_logo_path = match_data["home_team_logo"]
-
+            
             # Get away team logo
             away_team = match_data.get("away_team", {})
             away_logo_path = None
-
+            
             # Debug: Print available keys in away_team
             print(
                 f"DEBUG: Away team keys: {list(away_team.keys()) if isinstance(away_team, dict) else 'Not a dict'}"
             )
-
+            
             # Try multiple logo path sources
             if "logo" in away_team and away_team["logo"]:
                 away_logo_path = away_team["logo"]
@@ -2476,10 +2564,10 @@ class PlayOnTab(QWidget):
                 away_logo_path = away_team["logo_url"]
             elif "away_team_logo" in match_data and match_data["away_team_logo"]:
                 away_logo_path = match_data["away_team_logo"]
-
+            
             print(f"DEBUG: Home logo path: {home_logo_path}")
             print(f"DEBUG: Away logo path: {away_logo_path}")
-
+            
             # Helper to resolve a logo path with multiple fallbacks
             def resolve_logo_path(path_str: str) -> str | None:
                 try:
@@ -2513,7 +2601,7 @@ class PlayOnTab(QWidget):
                     return None
                 except Exception:
                     return None
-
+            
             # Load home team logo
             if home_logo_path and hasattr(self, "home_team_image"):
                 resolved_home = resolve_logo_path(home_logo_path)
@@ -2525,8 +2613,8 @@ class PlayOnTab(QWidget):
                         self.home_team_image.clear()
                         # Scale the pixmap to fit the label while maintaining aspect ratio
                         scaled_pixmap = pixmap.scaled(
-                            self.home_team_image.size(),
-                            Qt.AspectRatioMode.KeepAspectRatio,
+                            self.home_team_image.size(), 
+                            Qt.AspectRatioMode.KeepAspectRatio, 
                             Qt.TransformationMode.SmoothTransformation,
                         )
                         self.home_team_image.setPixmap(scaled_pixmap)
@@ -2547,7 +2635,7 @@ class PlayOnTab(QWidget):
                     self.home_team_image.clear()
                     self.home_team_image.setText("NO LOGO\nFOUND")
                 print("DEBUG: No home team logo path found")
-
+            
             # Load away team logo
             if away_logo_path and hasattr(self, "away_team_image"):
                 resolved_away = resolve_logo_path(away_logo_path)
@@ -2559,8 +2647,8 @@ class PlayOnTab(QWidget):
                         self.away_team_image.clear()
                         # Scale the pixmap to fit the label while maintaining aspect ratio
                         scaled_pixmap = pixmap.scaled(
-                            self.away_team_image.size(),
-                            Qt.AspectRatioMode.KeepAspectRatio,
+                            self.away_team_image.size(), 
+                            Qt.AspectRatioMode.KeepAspectRatio, 
                             Qt.TransformationMode.SmoothTransformation,
                         )
                         self.away_team_image.setPixmap(scaled_pixmap)
@@ -2581,7 +2669,7 @@ class PlayOnTab(QWidget):
                     self.away_team_image.clear()
                     self.away_team_image.setText("NO LOGO\nFOUND")
                 print("DEBUG: No away team logo path found")
-
+                
         except Exception as e:
             print(f"Error loading team logos: {e}")
             import traceback
@@ -2592,16 +2680,16 @@ class PlayOnTab(QWidget):
                 self.home_team_image.setText("NO LOGO\nFOUND")
             if hasattr(self, "away_team_image"):
                 self.away_team_image.setText("NO LOGO\nFOUND")
-
+    
     def _load_additional_fixture_data(self, match_data: dict):
         """Load additional fixture data like logos, venue, etc."""
         try:
             if not match_data:
                 return
-
+                
             # Note: Additional fixture data loading (logos, venue, weather, attendance)
             # is currently not implemented in the UI
-
+                
         except Exception as e:
             print(f"Error loading additional fixture data: {e}")
 
@@ -2652,7 +2740,7 @@ class PlayOnTab(QWidget):
             self.decrement_home_goals_with_scorer
         )
 
-        # Away goal panel (adjusted for better visibility)
+        # Away goal panel (adjusted for better visibility)  
         away_goal_panel = QWidget(self)
         away_goal_panel.setGeometry(1195, 10, 210, 140)
         away_goal_panel.setStyleSheet(f"""
@@ -3076,7 +3164,7 @@ class PlayOnTab(QWidget):
         self.increase_stat("shots_on_target", "home")
         # Enforce invariants after goal changes
         self._enforce_stats_invariants("home")
-
+        
         # Update scorer panel if it exists
         if hasattr(self, "home_scorer_panel"):
             self._ensure_scorer_panel_initialized("home")
@@ -3091,7 +3179,7 @@ class PlayOnTab(QWidget):
                     )
             except Exception:
                 pass
-
+            
         # Update stats widgets
         if hasattr(self, "stats_widgets") and "goals" in self.stats_widgets:
             self.stats_widgets["goals"]["home_value"].setText(str(self.home_goals))
@@ -3112,7 +3200,7 @@ class PlayOnTab(QWidget):
             )
         except Exception:
             pass
-
+        
         # Update scorer panel if it exists
         if hasattr(self, "home_scorer_panel"):
             self._ensure_scorer_panel_initialized("home")
@@ -3127,7 +3215,7 @@ class PlayOnTab(QWidget):
                     )
             except Exception:
                 pass
-
+            
         # Update stats widgets
         if hasattr(self, "stats_widgets") and "goals" in self.stats_widgets:
             self.stats_widgets["goals"]["home_value"].setText(str(self.home_goals))
@@ -3156,7 +3244,7 @@ class PlayOnTab(QWidget):
         self.increase_stat("shots_on_target", "away")
         # Enforce invariants after goal changes
         self._enforce_stats_invariants("away")
-
+        
         # Update scorer panel if it exists
         if hasattr(self, "away_scorer_panel"):
             self._ensure_scorer_panel_initialized("away")
@@ -3171,7 +3259,7 @@ class PlayOnTab(QWidget):
                     )
             except Exception:
                 pass
-
+            
         # Update stats widgets
         if hasattr(self, "stats_widgets") and "goals" in self.stats_widgets:
             self.stats_widgets["goals"]["away_value"].setText(str(self.away_goals))
@@ -3192,7 +3280,7 @@ class PlayOnTab(QWidget):
             )
         except Exception:
             pass
-
+        
         # Update scorer panel if it exists
         if hasattr(self, "away_scorer_panel"):
             self._ensure_scorer_panel_initialized("away")
@@ -3207,7 +3295,7 @@ class PlayOnTab(QWidget):
                     )
             except Exception:
                 pass
-
+            
         # Update stats widgets
         if hasattr(self, "stats_widgets") and "goals" in self.stats_widgets:
             self.stats_widgets["goals"]["away_value"].setText(str(self.away_goals))
@@ -3232,7 +3320,7 @@ class PlayOnTab(QWidget):
         # Away Scorer Panel (positioned above away cards panel)
         self.away_scorer_panel = ScorerPanel(
             self,
-            "AWAY SCORER PANEL",
+            "AWAY SCORER PANEL", 
             1260,
             160,  # Positioned above cards
             635,
@@ -3359,14 +3447,14 @@ class PlayOnTab(QWidget):
         self.home_cards_add_btn.setGeometry(10, 4, 30, 22)
         self.home_cards_add_btn.setFont(QFont("Verdana", 12, QFont.Weight.ExtraBold))
         self.home_cards_add_btn.setStyleSheet("""
-            QPushButton {
+            QPushButton { 
                 background-color: #4a5568;
-                color: white;
-                border: 1px solid #2d3748;
-                border-radius: 4px;
+                color: white; 
+                border: 1px solid #2d3748; 
+                border-radius: 4px; 
                 font-weight: bold;
             }
-            QPushButton:hover {
+            QPushButton:hover { 
                 background-color: #5a6578;
             }
         """)
@@ -3434,14 +3522,14 @@ class PlayOnTab(QWidget):
         self.away_cards_add_btn.setGeometry(10, 4, 30, 22)
         self.away_cards_add_btn.setFont(QFont("Verdana", 12, QFont.Weight.ExtraBold))
         self.away_cards_add_btn.setStyleSheet("""
-            QPushButton {
+            QPushButton { 
                 background-color: #4a5568;
-                color: white;
-                border: 1px solid #2d3748;
-                border-radius: 4px;
+                color: white; 
+                border: 1px solid #2d3748; 
+                border-radius: 4px; 
                 font-weight: bold;
             }
-            QPushButton:hover {
+            QPushButton:hover { 
                 background-color: #5a6578;
             }
         """)
@@ -3551,7 +3639,7 @@ class PlayOnTab(QWidget):
         self.away_card_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         # Away Card Table starts empty - rows will be added via + button
-
+        
         # Add custom delegate for time column in both cards tables
         time_delegate = TimeColumnDelegate()
         self.home_card_table.setItemDelegateForColumn(0, time_delegate)
@@ -3607,7 +3695,7 @@ class PlayOnTab(QWidget):
     def _initialize_card_table(self, table, team_type):
         """Initialize card table with proper structure from Substituted.py"""
         from PySide6.QtWidgets import QButtonGroup, QCheckBox, QHBoxLayout
-
+        
         # Initialize Card Table (adapted from Substituted.py)
         for row in range(table.rowCount()):
             time_item = QTableWidgetItem("00:00")
@@ -3792,7 +3880,7 @@ class PlayOnTab(QWidget):
                     "Please create a match in the Match Setup tab first before selecting players.",
                 )
                 return
-
+            
             # Check if row is locked
             lock_widget = table.cellWidget(row, 6)  # Lock column in cards table
             if lock_widget:
@@ -3869,19 +3957,19 @@ class PlayOnTab(QWidget):
                     font-weight: bold;
                 }
             """)
-
+            
             header = player_table.horizontalHeader()
             header.setSectionResizeMode(0, QHeaderView.Stretch)  # name
             header.setSectionResizeMode(1, QHeaderView.Fixed)  # number
             header.setSectionResizeMode(2, QHeaderView.Fixed)  # position
             header.setSectionResizeMode(3, QHeaderView.Fixed)  # yellow
             header.setSectionResizeMode(4, QHeaderView.Fixed)  # red
-
+            
             player_table.setColumnWidth(1, 80)
             player_table.setColumnWidth(2, 100)
             player_table.setColumnWidth(3, 40)
             player_table.setColumnWidth(4, 40)
-
+            
             player_table.verticalHeader().setVisible(False)
             player_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
             player_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
@@ -3946,13 +4034,13 @@ class PlayOnTab(QWidget):
             # Prepare players list - separate playing 11 from substitutes
             all_players = team_data.get("players", [])
             playing_11 = team_data.get("playing_11", [])
-
+            
             # Create a set of playing 11 player IDs for quick lookup
             playing_11_ids = set()
             for p11 in playing_11:
                 if isinstance(p11, dict):
                     playing_11_ids.add(p11.get("id", ""))
-
+            
             # Separate players into playing 11 and substitutes
             playing_players = []
             substitute_players = []
@@ -3961,7 +4049,7 @@ class PlayOnTab(QWidget):
                     playing_players.append(p)
                 else:
                     substitute_players.append(p)
-
+            
             # Sort both lists by jersey number if possible
             try:
                 playing_players = sorted(
@@ -3983,7 +4071,7 @@ class PlayOnTab(QWidget):
                 "asst._coach",
             ]
             num_officials = sum(1 for key in official_keys if team_data.get(key))
-
+            
             # Calculate total rows: playing_11 + substitutes_separator + substitutes + officials_separator + officials
             num_substitutes = len(substitute_players)
             total_rows = len(playing_players)
@@ -4390,7 +4478,7 @@ class PlayOnTab(QWidget):
     def toggle_card_row_lock(self, table, row, state):
         """Toggle lock state for card table row"""
         is_locked = state == Qt.CheckState.Checked.value
-
+        
         # Disable/enable widgets based on lock state
         # Time column (0) - should remain editable when unlocked
         time_item = table.item(row, 0)
@@ -4413,7 +4501,7 @@ class PlayOnTab(QWidget):
                 num_item.setFlags(
                     Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
                 )
-
+        
         for col in [2, 3, 4, 7]:  # Name, Yellow, Red, Reset (adjusted indices)
             widget = table.cellWidget(row, col)
             if widget:
@@ -4467,22 +4555,22 @@ class PlayOnTab(QWidget):
                     had_red = True
 
             # Preserve time - don't reset it
-            # Reset other data
+                # Reset other data
             if num_item:
                 num_item.setText("")
-
+                
             # Reset name button
             if name_btn:
                 name_btn.setText("Select Player")
-
-            # Reset checkboxes (Yellow, Red, Lock)
+                
+                                # Reset checkboxes (Yellow, Red, Lock)
             for col in [3, 4, 6]:  # Yellow, Red, Lock
                 widget = table.cellWidget(row, col)
                 if widget:
                     cb = widget.findChild(QCheckBox)
                     if cb:
                         cb.setChecked(False)
-                        # Enable yellow/red checkboxes, disable lock checkbox
+                                            # Enable yellow/red checkboxes, disable lock checkbox
                         cb.setEnabled(True if col in [3, 4] else False)
 
             # Remove player from yellow/red card tracking
@@ -4518,7 +4606,7 @@ class PlayOnTab(QWidget):
             total_rows = table.rowCount()
             for r in range(row + 1, total_rows):
                 table.hideRow(r)
-
+                
             print(
                 f"Reset card row {row} to default (preserved time, hidden rows below)"
             )
@@ -4550,7 +4638,7 @@ class PlayOnTab(QWidget):
 
         except Exception:
             print("Error resetting card row")
-
+    
     def update_all_stats_displays(self):
         """Update all stats displays to show current values."""
         try:
@@ -4558,10 +4646,10 @@ class PlayOnTab(QWidget):
             for stat_key in self.stats_data:
                 self.update_stat_display(stat_key, "home")
                 self.update_stat_display(stat_key, "away")
-
+            
             # Update possession times display
             self.update_possession_times()
-
+            
         except Exception as e:
             print(f"Error updating stats displays: {str(e)}")
 
@@ -4628,7 +4716,7 @@ class PlayOnTab(QWidget):
         self.radio_half_time = QRadioButton("HALF TIME", extra_timer_panel)
         self.radio_half_time.setGeometry(173, 8, 110, 24)
         self.radio_half_time.setFont(QFont("Verdana", 11))
-
+        
         self.radio_full_time = QRadioButton("FULL TIME", extra_timer_panel)
         self.radio_full_time.setGeometry(310, 8, 110, 24)
         self.radio_full_time.setFont(QFont("Verdana", 11))
@@ -4674,7 +4762,7 @@ class PlayOnTab(QWidget):
             "RESET ET", "danger", extra_timer_panel, font_size=12
         )
         self.btn_reset_timer.setGeometry(438, 59, 120, 40)
-
+        
         # Add proper styling for radio buttons
         radio_style = f"""
             QRadioButton {{
@@ -4704,26 +4792,26 @@ class PlayOnTab(QWidget):
                 border: 2px solid {CONFIG["colors"]["text"]};
             }}
         """
-
+        
         # Apply styling to radio buttons
         self.radio_current_time.setStyleSheet(radio_style)
         self.radio_half_time.setStyleSheet(radio_style)
         self.radio_full_time.setStyleSheet(radio_style)
         self.radio_extra_time.setStyleSheet(radio_style)
-
+        
         # Create button group and connect signals
         self.time_type_group = QButtonGroup(self)
         self.time_type_group.addButton(self.radio_current_time)
         self.time_type_group.addButton(self.radio_half_time)
         self.time_type_group.addButton(self.radio_full_time)
         self.time_type_group.addButton(self.radio_extra_time)
-
+        
         # Connect radio button signals
         self.radio_current_time.toggled.connect(self.update_time_type)
         self.radio_half_time.toggled.connect(self.update_time_type)
         self.radio_full_time.toggled.connect(self.update_time_type)
         self.radio_extra_time.toggled.connect(self.update_time_type)
-
+        
         # Connect button animations
         for radio in [
             self.radio_current_time,
@@ -4734,7 +4822,7 @@ class PlayOnTab(QWidget):
             animator = FontSizeAnimator(radio, 12)
             self.button_animators[radio] = animator
             radio.clicked.connect(lambda: self.animate_button_click(radio))
-
+        
         # Connect extra timer functionality
         animator_extra_time = FontSizeAnimator(self.btn_extra_time, 12)
         self.button_animators[self.btn_extra_time] = animator_extra_time
@@ -4742,14 +4830,14 @@ class PlayOnTab(QWidget):
             lambda: self.animate_button_click(self.btn_extra_time)
         )
         self.btn_extra_time.clicked.connect(self.apply_extra_time)
-
+        
         animator_reset_timer = FontSizeAnimator(self.btn_reset_timer, 12)
         self.button_animators[self.btn_reset_timer] = animator_reset_timer
         self.btn_reset_timer.clicked.connect(
             lambda: self.animate_button_click(self.btn_reset_timer)
         )
         self.btn_reset_timer.clicked.connect(self.reset_timer)
-
+        
         # Add extra time components
         self.extra_time_value_label = ModernLabel("+0", "success", self, font_size=25)
         self.extra_time_value_label.setGeometry(1100, 40, 55, 34)
@@ -4768,7 +4856,7 @@ class PlayOnTab(QWidget):
                 border: none;
             }}
         """)
-
+        
         self.extra_time_check = QCheckBox("Show Extra Time", extra_timer_panel)
         self.extra_time_check.setGeometry(255, 59, 178, 40)
         self.extra_time_check.setFont(QFont("Verdana"))
@@ -4794,7 +4882,7 @@ class PlayOnTab(QWidget):
             }}
         """)
         self.extra_time_check.stateChanged.connect(self.toggle_extra_time_label)
-
+        
         # Add up/down buttons for extra time
         self.extra_time_up_button = ModernButton(
             "\u25b2", "primary", extra_timer_panel, font_size=12
@@ -4836,7 +4924,7 @@ class PlayOnTab(QWidget):
         )
         stats_title.setGeometry(20, 0, 545, 60)  # Reduced width for smaller panel
         stats_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
+        
         # Deploy button positioned within the title label boundary
         self.stats_deploy_button = QPushButton("DEPLOY", stats_panel)
         self.stats_deploy_button.setFont(QFont("Verdana", 14, QFont.Weight.Bold))
@@ -4947,7 +5035,7 @@ class PlayOnTab(QWidget):
             lambda: self.animate_button_click(self.possession_toggle_btn)
         )
         self.possession_toggle_btn.clicked.connect(self.toggle_possession)
-
+        
         try:
             self.possession_toggle_btn.raise_()
         except Exception:
@@ -5079,7 +5167,7 @@ class PlayOnTab(QWidget):
                 )  # Center the narrower label
                 stat_label.setGeometry(stat_label_x, y_pos, stat_label_width, 30)
                 stat_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
+                
             if stat_label is not None:
                 if "Yellow" in label_text:
                     stat_label.setStyleSheet(f"""
@@ -5120,7 +5208,7 @@ class PlayOnTab(QWidget):
 
             if has_controls:
                 away_dec_x = away_header_x - 12
-                away_value_x = away_dec_x + 35
+                away_value_x = away_dec_x + 35 
                 away_inc_x = away_dec_x + 130
                 away_dec = ModernButton("◄", "primary", stats_panel, font_size=16)
                 away_dec.setGeometry(away_dec_x, y_pos, 30, 30)
@@ -5372,7 +5460,7 @@ class PlayOnTab(QWidget):
             print(
                 f"  - {key}: Home={widgets['home_value'].text()}, Away={widgets['away_value'].text()}"
             )
-
+    
     def deploy_all_stats(self):
         """Deploy all match statistics at once."""
         print("=== DEPLOYING ALL MATCH STATISTICS ===")
@@ -5381,7 +5469,7 @@ class PlayOnTab(QWidget):
                 f"  - {key}: Home={widgets['home_value'].text()}, Away={widgets['away_value'].text()}"
             )
         print("=== ALL STATISTICS DEPLOYED ===")
-
+        
         # Visual feedback for deployment
         original_style = self.stats_deploy_button.styleSheet()
         self.stats_deploy_button.setStyleSheet("""
@@ -5396,7 +5484,7 @@ class PlayOnTab(QWidget):
                 font-size: 14px;
             }}
         """)
-
+        
         # Reset button style after brief delay
         QTimer.singleShot(
             1000, lambda: self.stats_deploy_button.setStyleSheet(original_style)
@@ -5618,7 +5706,7 @@ class PlayOnTab(QWidget):
                 print(f"Error in _recompute_team_cards_and_fouls: {e}")
             except Exception:
                 pass
-
+    
     # Possession tracking methods (from Play_On.py)
     def _apply_possession_button_style(self, state: str):
         """Apply consistent styling to the possession toggle button."""
@@ -5690,14 +5778,14 @@ class PlayOnTab(QWidget):
             # Get short names from team data with fallback
             home_short = "Home Team"
             away_short = "Away Team"
-
+            
             if hasattr(self, "home_team_data") and self.home_team_data:
                 home_short = (
                     self.home_team_data.get("short_name")
                     or self.home_team_data.get("name")
                     or "Home Team"
                 )
-
+            
             if hasattr(self, "away_team_data") and self.away_team_data:
                 away_short = (
                     self.away_team_data.get("short_name")
@@ -5738,7 +5826,7 @@ class PlayOnTab(QWidget):
 
             if hasattr(self, "btn_start") and not self.btn_start.isEnabled():
                 self.btn_start.setEnabled(True)
-
+                
             # Update possession times and highlights
             self.update_possession_times()
 
@@ -5775,7 +5863,7 @@ class PlayOnTab(QWidget):
                     pass
         except Exception as e:
             print(f"Error in toggle_possession: {str(e)}")
-
+    
     def set_possession(self, side: str):
         """
         Single-way setter: sets possession to 'home' or 'away' by clicking the same
@@ -5798,13 +5886,13 @@ class PlayOnTab(QWidget):
                 print(f"Error in set_possession('{side}'): {e}")
             except Exception:
                 pass
-
+    
     def update_possession_button(self, team_name):
         """Update the possession button styling and text"""
         # Find the possession button in stats panel (if it exists)
         # This will be connected when the stats panel is fully implemented
         pass
-
+    
     def _rebalance_possession_times(self):
         """Ensure combined possession time never exceeds elapsed match time."""
         try:
@@ -5856,7 +5944,7 @@ class PlayOnTab(QWidget):
             self.away_ball_control_time = max(0, away_time)
         except Exception:
             pass
-
+    
     def update_possession_times(self):
         """Update Ball Control times, Possession percentages, and visual indicators."""
         try:
@@ -5946,10 +6034,10 @@ class PlayOnTab(QWidget):
                 self.update_team_panel_borders()
             except Exception:
                 pass
-
+                        
         except Exception as e:
             print(f"Error in update_possession_times: {str(e)}")
-
+    
     def update_team_panel_borders(self):
         """Highlight team panel border red for the team currently in possession."""
         try:
@@ -5992,7 +6080,7 @@ class PlayOnTab(QWidget):
                 print(f"Error in update_team_panel_borders: {e}")
             except Exception:
                 pass
-
+    
     def update_scorer_time_for_goal(self, team_type, current_time):
         """Update the time for the first empty row when a goal is scored"""
         try:
@@ -6002,12 +6090,12 @@ class PlayOnTab(QWidget):
                 self.away_scorer_panel.update_scorer_time(current_time)
         except Exception as e:
             print(f"Error in update_scorer_time_for_goal: {str(e)}")
-
+    
     def animate_button_click(self, button):
         """Animate button click with font size change"""
         try:
             from PySide6.QtCore import QEasingCurve, QPropertyAnimation
-
+            
             if button in self.button_animators:
                 animator = self.button_animators[button]
 
@@ -6042,7 +6130,7 @@ class PlayOnTab(QWidget):
                 return_animation.finished.connect(cleanup)
 
                 animation.start()
-
+                
         except Exception as e:
             print(f"Error in animate_button_click: {str(e)}")
 
@@ -6052,12 +6140,12 @@ class PlayOnTab(QWidget):
             data_key = f"{team}_{stat_key}"
             if data_key in self.stats_data:
                 self.stats_data[data_key] += 1
-
+                
                 # Update the display widget
                 if hasattr(self, "stats_widgets") and stat_key in self.stats_widgets:
                     widget = self.stats_widgets[stat_key][f"{team}_value"]
                     widget.setText(str(self.stats_data[data_key]))
-
+                
                 # When shots_on_target increases, also increase shots
                 if stat_key == "shots_on_target":
                     shots_key = f"{team}_shots"
@@ -6069,9 +6157,9 @@ class PlayOnTab(QWidget):
                         ):
                             shots_widget = self.stats_widgets["shots"][f"{team}_value"]
                             shots_widget.setText(str(self.stats_data[shots_key]))
-
+                    
                 print(f"Increased {team} {stat_key} to {self.stats_data[data_key]}")
-
+                
         except Exception as e:
             print(f"Error in increase_stat: {e}")
 
@@ -6086,12 +6174,12 @@ class PlayOnTab(QWidget):
                     if self.stats_data[data_key] <= sot:
                         return
                 self.stats_data[data_key] -= 1
-
+                
                 # Update the display widget
                 if hasattr(self, "stats_widgets") and stat_key in self.stats_widgets:
                     widget = self.stats_widgets[stat_key][f"{team}_value"]
                     widget.setText(str(self.stats_data[data_key]))
-
+                
                 # When shots_on_target decreases, also decrease shots
                 if stat_key == "shots_on_target":
                     shots_key = f"{team}_shots"
@@ -6103,9 +6191,9 @@ class PlayOnTab(QWidget):
                         ):
                             shots_widget = self.stats_widgets["shots"][f"{team}_value"]
                             shots_widget.setText(str(self.stats_data[shots_key]))
-
+                    
                 print(f"Decreased {team} {stat_key} to {self.stats_data[data_key]}")
-
+                
         except Exception as e:
             print(f"Error in decrease_stat: {e}")
 
@@ -6241,7 +6329,7 @@ class PlayOnTab(QWidget):
         """Handle yellow card checkbox state change"""
         try:
             from PySide6.QtCore import Qt
-
+            
             if state == Qt.CheckState.Checked.value:
                 # Get player info
                 name_btn = table.cellWidget(row, 2)
@@ -6285,16 +6373,16 @@ class PlayOnTab(QWidget):
                         f"Please remove that card first before changing this earlier row's card.",
                     )
                     return
-
+                
                 print(f"Yellow card given to {player_name} ({team_type} team)")
-
+                
                 # Uncheck red card (mutual exclusion)
                 red_widget = table.cellWidget(row, 4)
                 if red_widget:
                     red_cb = red_widget.findChild(QCheckBox)
                     if red_cb and red_cb.isChecked():
                         red_cb.setChecked(False)
-
+                        
                 # Show confirmation message
                 print(
                     f"✅ {team_type.title()} team: Yellow card given to {player_name}"
@@ -6310,11 +6398,11 @@ class PlayOnTab(QWidget):
                 else:
                     # Official without jersey number (track by name)
                     self.yellow_card_officials[normalized_team].add(player_name)
-
+                
                 # Do not auto-create a new row on toggle
                 # Update aggregated card stats and enforce fouls minimum
                 self.update_card_stats(team_type)
-
+                        
                 # Refresh yellow card highlighting in scorer panels
                 if hasattr(self, "home_scorer_panel"):
                     self.home_scorer_panel.refresh_yellow_card_highlighting()
@@ -6351,7 +6439,7 @@ class PlayOnTab(QWidget):
                 print(f"Yellow card removed for {team_type} team")
                 # Recompute stats from current table state so fouls and cards decrease correctly
                 self.update_card_stats(team_type)
-
+                
                 # Refresh yellow card highlighting in scorer panels
                 if hasattr(self, "home_scorer_panel"):
                     self.home_scorer_panel.refresh_yellow_card_highlighting()
@@ -6375,7 +6463,7 @@ class PlayOnTab(QWidget):
         """Handle red card checkbox state change"""
         try:
             from PySide6.QtCore import Qt
-
+            
             if state == Qt.CheckState.Checked.value:
                 # Get player info
                 name_btn = table.cellWidget(row, 2)
@@ -6420,19 +6508,19 @@ class PlayOnTab(QWidget):
                         f"Please remove that card first before changing this earlier row's card to red.",
                     )
                     return
-
+                
                 print(f"Red card given to {player_name} ({team_type} team)")
-
+                
                 # Uncheck yellow card (mutual exclusion)
                 yellow_widget = table.cellWidget(row, 3)
                 if yellow_widget:
                     yellow_cb = yellow_widget.findChild(QCheckBox)
                     if yellow_cb and yellow_cb.isChecked():
                         yellow_cb.setChecked(False)
-
+                        
                 # Show confirmation message
                 print(f" {team_type.title()} team: Red card given to {player_name}")
-
+                
                 # Do not auto-create a new row on toggle
                 # Update aggregated card stats and enforce fouls minimum
                 self.update_card_stats(team_type)
@@ -6449,7 +6537,7 @@ class PlayOnTab(QWidget):
                     player_name=player_name,
                     entity_type=entity_type,
                 )
-
+                        
             else:
                 # Red card was removed
                 print(f"Red card removed for {team_type} team")
@@ -6468,7 +6556,7 @@ class PlayOnTab(QWidget):
                     player_name=player_name,
                     entity_type=entity_type,
                 )
-
+                
         except Exception as e:
             print(f"Error in on_red_card_changed: {e}")
 
@@ -6618,11 +6706,11 @@ class PlayOnTab(QWidget):
                 return
             # Get current row count
             current_rows = table.rowCount()
-
+            
             # Add one new row
             table.setRowCount(current_rows + 1)
             new_row = current_rows
-
+            
             # Initialize the new row with the same structure as existing rows
             self._initialize_single_card_row(table, new_row, team_type)
             print(f"Added new card row for {team_type} team")
@@ -6640,7 +6728,7 @@ class PlayOnTab(QWidget):
                 QHBoxLayout,
                 QPushButton,
             )
-
+            
             # Time item - use running clock like scorer panel
             current_time = (
                 self.get_current_time_text()
@@ -6822,7 +6910,7 @@ class PlayOnTab(QWidget):
             reset_btn.setProperty("table", table)
             reset_btn.clicked.connect(self._on_cards_reset_clicked)
             table.setCellWidget(row, 7, reset_btn)
-
+            
         except Exception as e:
             print(f"Error in _initialize_single_card_row: {e}")
 
@@ -7075,11 +7163,11 @@ class PlayOnTab(QWidget):
         try:
             # Get current row count
             current_rows = table.rowCount()
-
+            
             # Add one new row
             table.setRowCount(current_rows + 1)
             new_row = current_rows
-
+            
             # Time item - use running clock like scorer panel
             current_time = self.get_current_time_text()
             try:
@@ -7276,7 +7364,7 @@ class PlayOnTab(QWidget):
             table.setCellWidget(new_row, 7, reset_btn)
 
             print(f" Added new card row {new_row + 1} for {team_type} team")
-
+            
         except Exception as e:
             print(f"Error adding new card row: {e}")
             import traceback
