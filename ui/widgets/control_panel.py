@@ -6,6 +6,7 @@ Migrated from team_panel.py to centralize control panel functionality
 
 import re
 import traceback
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
@@ -23,6 +24,9 @@ from PySide6.QtWidgets import (
 
 from .color_panel import ColorPanel
 from .color_utils import extract_bottom_left_color, extract_top_colors
+
+# Backend URL for asset proxy
+BACKEND_ASSET_URL = "http://localhost:8000"
 
 
 class ControlPanel(QFrame):
@@ -486,6 +490,46 @@ class ControlPanel(QFrame):
             print(f"Error handling color change: {e}")
             traceback.print_exc()
 
+    def _download_kit_from_backend(self, image_url: str) -> Optional[Path]:
+        """Download kit image from backend and cache locally.
+        
+        Args:
+            image_url: URL like '/assets/kits/dhangadhi_home.png' or full URL
+            
+        Returns:
+            Path to the cached local file, or None if download failed
+        """
+        try:
+            if not image_url:
+                return None
+            
+            # Handle both full URLs and relative paths
+            if image_url.startswith("http://") or image_url.startswith("https://"):
+                full_url = image_url
+            else:
+                full_url = f"{BACKEND_ASSET_URL}{image_url}"
+            
+            # Extract filename and create cache path
+            filename = Path(image_url).name
+            cache_dir = Path("data/assets/kits")
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            cache_path = cache_dir / filename
+            
+            # Return cached file if exists
+            if cache_path.exists():
+                print(f"Using cached kit image: {cache_path}")
+                return cache_path
+            
+            # Download from backend
+            print(f"Downloading kit image from: {full_url}")
+            urllib.request.urlretrieve(full_url, str(cache_path))
+            print(f"Cached kit image to: {cache_path}")
+            return cache_path
+            
+        except Exception as e:
+            print(f"Failed to download kit from backend: {e}")
+            return None
+
     def load_jersey_image(self):
         """Load and display jersey image based on kit type or stored kit_image from JSON"""
         try:
@@ -497,6 +541,7 @@ class ControlPanel(QFrame):
                 # Support @ prefix (like other resources)
                 clean_name = filename[1:] if filename.startswith("@") else filename
                 candidates = [
+                    Path("data/assets/kits") / clean_name,  # Check backend cache first
                     Path("resources/images") / filename,
                     Path("resources/images") / clean_name,
                     Path("resources/images/jersey") / filename,
@@ -510,6 +555,7 @@ class ControlPanel(QFrame):
                 return None
 
             image_path: Optional[Path] = None
+            selected_kit: Optional[dict] = None
             team_panel = self._find_team_panel_parent()
 
             # Prefer explicit kits array when available
@@ -526,12 +572,17 @@ class ControlPanel(QFrame):
                 }
                 selected_label = self.kit_button.text() or "Home Kit"
                 selected_type = kit_type_map.get(selected_label, "home")
-                kit = next((k for k in kits if k.get("type") == selected_type), None)
-                if not kit:
+                selected_kit = next((k for k in kits if k.get("type") == selected_type), None)
+                if not selected_kit:
                     # Fallback to home kit if selected type missing
-                    kit = next((k for k in kits if k.get("type") == "home"), None)
-                if kit:
-                    image_path = resolve_image_path(kit.get("image"))
+                    selected_kit = next((k for k in kits if k.get("type") == "home"), None)
+                if selected_kit:
+                    # Try local image first
+                    image_path = resolve_image_path(selected_kit.get("image"))
+                    
+                    # If not found locally, try downloading from backend via image_url
+                    if (not image_path or not image_path.exists()) and selected_kit.get("image_url"):
+                        image_path = self._download_kit_from_backend(selected_kit.get("image_url"))
 
             # Fallback to single kit_image stored on the team (default kit)
             if not image_path or not image_path.exists():
@@ -591,6 +642,8 @@ class ControlPanel(QFrame):
                     )
                     self.image_label.setPixmap(scaled_pixmap)
                     print(f"Loaded kit image: {image_path} for {self.team_name}")
+                    
+                    # Always extract colors from the kit image
                     try:
                         c1, c2, mode = extract_top_colors(str(image_path))
                         if self.color_panel:

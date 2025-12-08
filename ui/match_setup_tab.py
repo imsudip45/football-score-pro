@@ -613,10 +613,22 @@ class MatchSetupTab(QWidget):
             # Convert players to the format expected by TeamPanel
             players = []
             for player in team_data.get("players", []):
+                full_name = (
+                    player.get("full_name")
+                    or player.get("name")
+                    or player.get("short_name")
+                    or ""
+                )
+                jersey_number = player.get("jersey_number")
+                if jersey_number is None:
+                    jersey_number = player.get("number", 0)
+
                 player_dict = {
-                    "jersey_number": player.get("jersey_number", 0),
-                    "name": player.get("full_name", ""),
+                    "jersey_number": jersey_number,
+                    "name": full_name,
+                    "full_name": full_name,
                     "id": player.get("id", ""),
+                    "team_id": player.get("team_id"),
                     "position": player.get("position", ""),
                     "selected": False,  # Default to not selected
                 }
@@ -1264,26 +1276,41 @@ class MatchSetupTab(QWidget):
     def _finish_match_creation(self, match_data: dict, progress: QProgressDialog):
         """Finish the match creation process"""
         try:
-            # Here you would typically save to backend or database
-            # For now, we'll just emit the signal
-            match_id = f"match_{self.get_match_number()}_{hash(str(match_data))}"
-            self.current_match_id = match_id
+            # Generate a deterministic fallback ID in case backend creation fails
+            fallback_match_id = f"match_{self.get_match_number()}_{hash(str(match_data))}"
+            backend_result = None
+            backend_match_id: Optional[str] = None
+
+            # Always mark the local status as created before syncing
+            match_data["status"] = "created"
+
+            try:
+                # Create match in backend - this syncs match data to the FastAPI server
+                backend_result = sync_match_snapshot(match_data)
+                if backend_result:
+                    backend_match_id = backend_result.get("id") or backend_result.get("match_id")
+                    if backend_match_id:
+                        print(f"[MatchSetupTab] Backend match created: {backend_match_id}")
+                    else:
+                        print("[MatchSetupTab] Backend sync succeeded but no match ID returned")
+                else:
+                    print("[MatchSetupTab] Backend sync returned None - match may not be saved to backend")
+            except Exception as exc:
+                print(f"[MatchSetupTab] Backend sync failed: {exc}")
+
+            # Decide which match ID to use going forward
+            final_match_id = backend_match_id or fallback_match_id
+            self.current_match_id = final_match_id
+
+            # Make sure downstream tabs see the canonical identifier
+            match_data["match_id"] = final_match_id
+            match_data.setdefault("id", final_match_id)
 
             progress.close()
 
-            # Emit match created signal
-            self.match_created.emit(match_id)
-
-            # CRITICAL: Emit match_data_changed signal with complete data so Play On and Subs/Penalty tabs become operational
-            # This ensures both tabs receive the match data with playing 11 and substitutions
-            match_data["match_id"] = match_id
-            match_data["status"] = "created"  # Match is now created
+            # Notify the rest of the app using the canonical match id
+            self.match_created.emit(final_match_id)
             self.match_data_changed.emit(match_data)
-
-            try:
-                sync_match_snapshot(match_id, match_data)
-            except Exception as exc:
-                print(f"[MatchSetupTab] Backend sync failed: {exc}")
 
             # Show success message
             QMessageBox.information(

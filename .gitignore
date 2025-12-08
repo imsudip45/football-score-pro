@@ -34,6 +34,11 @@ env/
 # Node dependencies
 /node_modules/
 /football-score-pro-control-desk/node_modules/
+.idea/
+.vscode/
+.next/
+node_modules
+
 
 # Tool caches
 /.mypy_cache/
