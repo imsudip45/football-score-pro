@@ -27,7 +27,9 @@ const PORT = process.env.PORT || 3001;
 
 // Error handling
 process.on('uncaughtException', (err) => {
+  // Log and exit: after an uncaught exception the process state is unknown
   console.error('Uncaught Exception:', err);
+  process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
@@ -719,6 +721,9 @@ app.get('/api/fixtures/:id', (req, res) => {
   const homeTeam = teams[fixture.home_team_id];
   const awayTeam = teams[fixture.away_team_id];
   const tournament = tournaments[fixture.tournament_id];
+  if (!homeTeam || !awayTeam || !tournament) {
+    return res.status(500).json({ error: 'Fixture references a missing team or tournament' });
+  }
 
   // Return full fixture data ready for match creation
   res.json({
