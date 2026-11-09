@@ -1,45 +1,28 @@
-/.pytest_cache
-/backend
-/color_tester.py
-/cursor_continue_the_discussion.md
-/football-score-pro-control-desk
-/FRONTEND_PROMPT.md
-/FSP for testing
-/FSP for testing.zip
-/subs_penalty_backup.py
-/t.py
-/test_app.py
-/UI_SHOWCASE.md
-/__pycache__
-
-# Python caches & virtual envs
+# Python
+__pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-**/__pycache__/
 .venv/
 venv/
 env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Logs / databases / local state
+# Local state written by the app
+/data/
+/logs/
 *.log
 *.db
 *.sqlite3
-/logs/
 
-# Generated / heavy data exports
-/data/
-/resources/images/*.docx
-
-# Node dependencies
-/node_modules/
-/football-score-pro-control-desk/node_modules/
-.idea/
-.vscode/
+# Node
+node_modules/
 .next/
-node_modules
+out/
 
-
-# Tool caches
-/.mypy_cache/
-/.ruff_cache/
+# Local scratch files
+/backend
+/FSP for testing
+/FSP for testing.zip
+.env
+.env.local

@@ -1,206 +1,92 @@
-# Football Score Pro 2.0
+# Football Score Pro
 
-A comprehensive football match management application built with PySide6 and a clean, modular architecture.
+Desktop software for running a football match broadcast: the operator sets up
+the two teams, officials and on-air guests, then runs the clock, goals, cards,
+substitutions and penalty shootouts from one window during the match.
 
-## Features
+I built it at FutureFrame (Lalitpur, Nepal) between 2025 and 2026, in Python
+with PySide6. The repository also holds two smaller pieces that grew around
+it: a sample fixtures server in Node.js and a web match-control dashboard in
+Next.js.
 
-- **Team Management**: Import and manage team data with player information
-- **Match Configuration**: Set up matches with customizable rules and settings
-- **Officials Assignment**: Assign referees, assistants, and VAR officials
-- **Event-Driven Architecture**: Clean separation of concerns with event-based communication
-- **Modern UI**: Professional interface with responsive design
-- **Data Persistence**: JSON-based data storage for teams, matches, and tournaments
+## What's in here
 
-## Architecture
+| Path | What it is |
+| --- | --- |
+| `main.py`, `src/`, `ui/` | The desktop app (PySide6). `src/` is the domain layer: models, services and an event bus. `ui/` is the Qt interface. |
+| `cloud-backend/` | Express server with sample tournaments, fixtures and teams. The desktop app's fixture loader can pull a match from it. |
+| `match-control-dashboard/` | Next.js dashboard for clock, events, stats and penalty shootouts in the browser. |
+| `tests/` | Service-level tests that run without the UI. |
 
-The application follows a layered architecture with clear separation of concerns:
+## The desktop app
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ UI Layer (PySide6)                                         │
-├─────────────────────────────────────────────────────────────┤
-│ Service Container (Dependency Injection)                   │
-├─────────────────────────────────────────────────────────────┤
-│ Service Layer (Business Logic)                             │
-│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐           │
-│ │ TeamService │ │MatchService │ │TournamentSvc│           │
-│ └─────────────┘ └─────────────┘ └─────────────┘           │
-├─────────────────────────────────────────────────────────────┤
-│ Cross-Cutting Concerns                                     │
-│ ┌─────────────┐ ┌─────────────┐                           │
-│ │ValidationSvc│ │ EventBus    │                           │
-│ └─────────────┘ └─────────────┘                           │
-├─────────────────────────────────────────────────────────────┤
-│ Domain Models                                              │
-│ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐                   │
-│ │Team │ │Match│ │Player│ │Config│ │Result│                   │
-│ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘                   │
-├─────────────────────────────────────────────────────────────┤
-│ Data Persistence (JSON Files)                              │
-└─────────────────────────────────────────────────────────────┘
-```
+Three tabs:
 
-## Project Structure
+- **Match Setup**: home and away squads, formations, kits and colours (the
+  kit colours are read from the jersey image), officials, commentators, hosts,
+  guests and organisers. Fixtures can be loaded from a JSON file, a URL or the
+  fixtures server.
+- **Play On**: match clock and halves, goals with scorers and times, cards,
+  and possession.
+- **Subs & Penalty**: substitutions (with red-card and second-yellow locks)
+  and penalty shootouts.
 
-```
-FSP/
-├── src/                    # Source code
-│   ├── models/            # Domain models
-│   ├── services/          # Business logic services
-│   └── events/            # Event system
-├── ui/                    # User interface
-│   ├── widgets/           # UI components
-│   └── styles/            # UI styling
-├── data/                  # Data storage
-│   ├── teams/            # Team data
-│   ├── tournaments/      # Tournament data
-│   └── matches/          # Match data
-├── tests/                # Test files
-├── resources/            # Images and assets
-├── main.py              # Application entry point
-├── test_app.py          # Test script
-└── requirements.txt     # Dependencies
-```
+Keyboard shortcuts can be remapped from the Tools menu, and the operator can
+lock the window with a PIN so a stray click can't change a live match.
 
-## Installation
+### Structure
 
-1. **Clone or download the project**
-2. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+The UI never talks to storage directly. `main.py` builds a small service
+container (team, match, tournament, officials, fixture, formation and
+validation services) around a shared `EventBus`, and the UI goes through a
+`BackendService` wrapper. Services publish typed events (`team_imported`,
+`officials_assigned`, ...) that the UI subscribes to. Data is stored as JSON
+under `data/`.
 
-## Usage
+### Run it
 
-### Quick Start (Windows)
-- **UI Application**: Double-click `run_ui.bat` (or run `python main.py`)
-- **Backend Demo**: Double-click `run_demo.bat` (or run `python main.py --demo`)
-- **Run Tests**: Double-click `run_tests.bat`
+Python 3.10 or newer.
 
-### Command Line Usage
-
-#### UI Application (default)
-Launch the full UI (also works on macOS/Linux):
 ```bash
-cd FSP
-python main.py
+pip install -r requirements.txt
+python main.py           # the desktop app
+python main.py --demo    # service demo in the terminal, no UI
+pytest                   # tests
 ```
 
-#### Backend Demo
-Run the backend demonstration to see the services in action:
+The operator PIN defaults to `2580`; change it from Tools > Set PIN, or set
+`FSP_DEFAULT_PIN`. There is no recovery PIN unless you set `FSP_MASTER_PIN`.
+
+## Fixtures server
+
 ```bash
-cd FSP
-python main.py --demo
+cd cloud-backend
+npm install
+npm start                # http://localhost:3001
 ```
 
-#### Testing
-Run the test suite to verify everything works:
+`GET /api/tournaments`, `/api/fixtures`, `/api/fixtures/:id` and `/api/teams`
+return the sample data in `server.js`. The kit images in `assets/kits/` are
+plain generated shirts; club crests are not included.
+
+## Match-control dashboard
+
 ```bash
-cd FSP
-python test_app.py
+cd match-control-dashboard
+npm install
+npm run dev              # http://localhost:3000
 ```
 
-## Web Control Room & FastAPI Backend
+The dashboard and the desktop app's live sync (`ui/backend_api.py`,
+`ui/backend_ws_client.py`) expect a match API at `http://localhost:8000`
+(set `NEXT_PUBLIC_API_URL` to change it). That API was a separate FastAPI
+service and is **not in this repository**, so without it the dashboard loads
+but can't create or update matches. The desktop app works on its own.
 
-A React frontend (`pitchcontrol-pro/`) and a FastAPI backend (`backend/`) are included for browser-based match operations.
+## Notes
 
-1. **Backend**
-   ```bash
-   cd backend
-   python -m venv .venv
-   .venv\Scripts\activate
-   pip install -r requirements.txt
-   uvicorn backend.main:app --reload --port 8000
-   ```
-2. **Frontend**
-   ```bash
-   cd pitchcontrol-pro
-   npm install
-   echo VITE_API_BASE_URL=http://localhost:8000 > .env.local
-   npm run dev
-   ```
-3. Open `http://localhost:5173` and create a match. The desktop Qt app can POST snapshots to `http://localhost:8000/matches/{id}/sync` to stay synchronized.
-
-## Key Components
-
-### Domain Models
-- **Team**: Represents a football team with players and metadata
-- **Player**: Individual player information and statistics
-- **Match**: Match configuration, teams, officials, and status
-- **Tournament**: Tournament rules and configuration
-- **MatchConfiguration**: Match rules and settings
-
-### Services
-- **TeamService**: Manages team data import and validation
-- **MatchService**: Handles match creation and management
-- **TournamentService**: Manages tournament data and rules
-- **ValidationService**: Validates business rules and data integrity
-- **EventBus**: Handles inter-service communication
-
-### UI Components
-- **MatchSetupTab**: Main interface for setting up matches
-- **TeamPanel**: Team selection and player management
-- **OfficialsTab**: Officials assignment interface
-- **BackendService**: Bridges UI and backend services
-
-### Menu Structure
-- **File Menu**:
-  - New Match (Ctrl+N)
-  - Load Match (Ctrl+O)
-  - Load Team Data (Ctrl+T)
-  - Exit (Ctrl+Q)
-- **Help Menu**:
-  - About
-
-### Sample Data
-- **`data/sample_teams.json`**: 5 Premier League teams with complete squads (100 players)
-- **`data/sample_teams_small.json`**: 2 Premier League teams with starting XI (22 players)
-- **Teams included**: Manchester United, Liverpool FC, Arsenal FC, Chelsea FC, Manchester City
-- **Automatic Loading**: First team becomes Team A, second team becomes Team B
-- **Radio Button Labels**: Show actual team names (e.g., "MUFC Data", "LFC Data")
-
-## Design Patterns
-
-- **Dependency Injection**: Services are injected through the service container
-- **Event-Driven Architecture**: Loose coupling through event publishing/subscription
-- **Repository Pattern**: Data access abstraction
-- **Result Pattern**: Structured error handling and validation
-- **Interface Segregation**: Clean service contracts
-
-## Development
-
-### Adding New Features
-1. Create domain models in `src/models/`
-2. Define service interfaces in `src/services/interfaces.py`
-3. Implement services in `src/services/`
-4. Create UI components in `ui/widgets/`
-5. Add tests in `tests/`
-
-### Event System
-The application uses an event-driven architecture for loose coupling:
-- Services publish events when data changes
-- UI components subscribe to relevant events
-- Events are typed and contain structured data
-
-### Data Validation
-All data goes through comprehensive validation:
-- Business rule validation
-- Data type and format validation
-- Cross-service consistency checks
-- Structured error reporting
-
-## Contributing
-
-1. Follow the established architecture patterns
-2. Add comprehensive tests for new features
-3. Use the event system for inter-component communication
-4. Maintain clean separation between UI and business logic
-5. Document new services and components
-
-## License
-
-This project is part of the Football Score Pro application suite.
-
-## Support
-
-For issues or questions, please refer to the project documentation or contact the development team.
+- Sample data uses real club and player names for testing; no club artwork is
+  included.
+- This is the code as it stood when I left the project, with a few fixes
+  applied afterwards (officials assignment, the demo, the recovery PIN, and
+  dependency updates in the dashboard). See the commit history.
