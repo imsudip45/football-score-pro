@@ -3,10 +3,8 @@
  * Connects to FastAPI backend at localhost:8000
  */
 
-// Use window check to safely access env in browser/SSR
-const BASE_URL = typeof window !== 'undefined' 
-  ? (window as any).__NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-  : 'http://localhost:8000';
+// Set NEXT_PUBLIC_API_URL to point the dashboard at a different match API
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface ApiResponse<T> {
   data: T | null;
