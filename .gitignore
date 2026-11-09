@@ -21,7 +21,6 @@ node_modules/
 out/
 
 # Local scratch files
-/backend
 /FSP for testing
 /FSP for testing.zip
 .env
