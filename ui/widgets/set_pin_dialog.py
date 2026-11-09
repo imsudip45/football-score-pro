@@ -191,7 +191,9 @@ class SetPinDialog(QDialog):
         new_pin = self.new_pin_input.text().strip()
         confirm_pin = self.confirm_pin_input.text().strip()
 
-        if current not in (self._current_pin, AppConstants.MASTER_PIN):
+        if current != self._current_pin and not (
+            AppConstants.MASTER_PIN and current == AppConstants.MASTER_PIN
+        ):
             QMessageBox.warning(self, "Incorrect PIN", "The current PIN you entered is incorrect.")
             self.current_pin_input.clear()
             self.current_pin_input.setFocus()

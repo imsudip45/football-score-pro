@@ -2,11 +2,17 @@
 Football Score Pro 2.0 - Application Constants
 """
 
+import os
+
+
 class AppConstants:
     VERSION = "2.0.0"
     RELEASE = "stable"
-    DEFAULT_PIN = "2580"
-    MASTER_PIN = "0000"
+    # PIN used by the operator lock until it is changed in Tools > Set PIN.
+    DEFAULT_PIN = os.environ.get("FSP_DEFAULT_PIN", "2580")
+    # Recovery PIN that can replace a forgotten PIN. Disabled unless
+    # FSP_MASTER_PIN is set, so a published value can't unlock every install.
+    MASTER_PIN = os.environ.get("FSP_MASTER_PIN") or None
 
 class TeamConstants:
     TEAM_A = "Team A"

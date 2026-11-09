@@ -37,6 +37,7 @@ from .widgets.lock_option_dialog import LockOptionDialog
 from .widgets.lock_overlay import LockOverlay
 from .widgets.pin_dialog import PinDialog
 from .widgets.set_pin_dialog import SetPinDialog
+from src.constants import AppConstants
 
 
 class NoFocusStyle(QProxyStyle):
@@ -93,7 +94,7 @@ class MainWindow(QMainWindow):
         # Lock state
         self.is_locked = False
         self.is_master_locked = False  # Master lock state for all tabs
-        self.current_pin = "2580"  # Default PIN     
+        self.current_pin = AppConstants.DEFAULT_PIN
         self._live_tabs_enabled = False
         self._last_tab_index = 0
         self.current_match_id = None
