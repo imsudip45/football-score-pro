@@ -215,8 +215,8 @@ class OfficialsAssignedEvent(BaseEvent):
         return {
             "referee": self.officials.referee,
             "assistant_referees": [
-                self.officials.assistant_referee_1,
-                self.officials.assistant_referee_2
+                self.officials.linesman_1,
+                self.officials.linesman_2
             ],
             "fourth_official": self.officials.fourth_official,
             "var_team": {

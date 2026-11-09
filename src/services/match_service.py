@@ -251,13 +251,16 @@ class MatchService(IMatchService):
                     return SaveResult.failure_result(validation_result.errors)
             
             # Create new officials object
+            # The UI sends assistant_referee_N / avar_referee, older callers
+            # send linesman_N / assistant_var; MatchOfficials uses linesman_N
+            # and avar_referee.
             new_officials = MatchOfficials(
                 referee=officials.get('referee', 'TBD'),
-                assistant_referee_1=officials.get('assistant_referee_1'),
-                assistant_referee_2=officials.get('assistant_referee_2'),
+                linesman_1=officials.get('linesman_1') or officials.get('assistant_referee_1'),
+                linesman_2=officials.get('linesman_2') or officials.get('assistant_referee_2'),
                 fourth_official=officials.get('fourth_official'),
                 var_referee=officials.get('var_referee'),
-                avar_referee=officials.get('assistant_var')
+                avar_referee=officials.get('avar_referee') or officials.get('assistant_var')
             )
             
             # Update match
@@ -274,7 +277,6 @@ class MatchService(IMatchService):
                 event = OfficialsAssignedEvent(
                     match_id=match.id,
                     officials=new_officials,
-                    is_complete_team=new_officials.has_complete_officiating_team()
                 )
                 self.event_bus.publish("officials_assigned", event)
             

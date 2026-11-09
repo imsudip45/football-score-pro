@@ -214,22 +214,31 @@ class ValidationService(IValidationService):
                     "duplicate_assignments"
                 )
         
-        # Recommendations for complete officiating team
-        recommended_officials = ["assistant_referee_1", "assistant_referee_2", "fourth_official"]
-        missing_recommended = [off for off in recommended_officials if not officials.get(off)]
-        
+        # Recommendations for complete officiating team. Accept both naming
+        # schemes used across the app (assistant_referee_N / linesman_N).
+        def _has(*keys):
+            return any(officials.get(k) for k in keys)
+
+        missing_recommended = []
+        if not _has("assistant_referee_1", "linesman_1"):
+            missing_recommended.append("Assistant Referee 1")
+        if not _has("assistant_referee_2", "linesman_2"):
+            missing_recommended.append("Assistant Referee 2")
+        if not _has("fourth_official"):
+            missing_recommended.append("Fourth Official")
+
         if missing_recommended:
-            result.add_warning(
-                f"Consider assigning: {', '.join([off.replace('_', ' ').title() for off in missing_recommended])}"
-            )
-        
+            result.add_warning(f"Consider assigning: {', '.join(missing_recommended)}")
+
         # VAR validation
-        if officials.get("var_referee") and not officials.get("assistant_var"):
+        has_var = _has("var_referee")
+        has_avar = _has("assistant_var", "avar_referee")
+        if has_var and not has_avar:
             result.add_warning("VAR Referee assigned but no Assistant VAR. Consider assigning both.")
-        
-        if officials.get("assistant_var") and not officials.get("var_referee"):
+
+        if has_avar and not has_var:
             result.add_warning("Assistant VAR assigned but no VAR Referee. Consider assigning both.")
-        
+
         return result
 
     def validate_tournament_rules(self, tournament: Tournament) -> ValidationResult:

@@ -408,17 +408,42 @@ class FootballScoreProApp:
         else:
             print(f"Team import failed: {result.errors}")
 
+        # A match needs two different teams, so import a second one
+        away_team_data = {
+            "id": "demo_away_2024",
+            "full_name": "Demo Away Football Club",
+            "short_name": "DAF",
+            "manager": "Demo Manager",
+            "head_coach": "Demo Coach",
+            "players": [
+                {
+                    "id": f"away_player_{n}",
+                    "team_id": "demo_away_2024",
+                    "full_name": f"Away Player {n}",
+                    "short_name": f"A. Player {n}",
+                    "jersey_number": n,
+                    "position": "GK" if n == 1 else "DEF" if n <= 5 else "MID" if n <= 8 else "FWD",
+                }
+                for n in range(1, 12)
+            ],
+        }
+        away_result = team_service.import_from_json_data(away_team_data)
+        if away_result.success:
+            print(f"Team imported: {away_result.team.id if away_result.team else 'Unknown'}")
+        else:
+            print(f"Team import failed: {away_result.errors}")
+
         # Demo 3: Create a match
         print("\nDemo 3: Creating Match")
         match_service = self.get_match_service()
 
-        # Get the imported team
-        arsenal_team = team_service.get_team_by_id("arsenal_2024")
-        if arsenal_team:
-            # Create a simple match with the same team (for demo purposes)
+        home_team = team_service.get_team_by_id("arsenal_2024")
+        away_team = team_service.get_team_by_id("demo_away_2024")
+        demo_ok = False
+        if home_team and away_team:
             match_data = {
-                "home_team": arsenal_team,
-                "away_team": arsenal_team,  # Same team for demo
+                "home_team": home_team,
+                "away_team": away_team,
                 "venue": "Emirates Stadium",
                 "match_date": "2024-08-17",
                 "match_time": "15:00",
@@ -428,12 +453,8 @@ class FootballScoreProApp:
             }
 
             result = match_service.create_match(match_data)
-            if result.success:
-                # Match was created successfully; created_id may or may not be present
-                if result.created_id:
-                    print(f"Match created: {result.created_id}")
-                else:
-                    print("Match created successfully (no ID returned)")
+            if result.success and result.created_id:
+                print(f"Match created: {result.created_id}")
 
                 # Demo 4: Assign officials
                 print("\nDemo 4: Assigning Officials")
@@ -444,20 +465,24 @@ class FootballScoreProApp:
                     "fourth_official": "David Coote",
                     "var_referee": "Paul Tierney",
                 }
-
-                if result.created_id:
-                    officials_result = match_service.assign_officials(
-                        result.created_id, officials
-                    )
+                officials_result = match_service.assign_officials(
+                    result.created_id, officials
+                )
                 if officials_result.success:
                     print("Officials assigned successfully")
+                    demo_ok = True
                 else:
                     print(f"Officials assignment failed: {officials_result.errors}")
-
+            elif result.success:
+                print("Match created, but no match ID was returned")
             else:
                 print(f"Match creation failed: {result.errors}")
         else:
-            print("Could not find imported team")
+            print("Could not find the imported teams")
+
+        if not demo_ok:
+            print("\nDemo finished with errors (see above).")
+            return
 
         print("\nDemo completed successfully!")
         print("\nNext steps:")
