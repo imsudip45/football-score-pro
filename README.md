@@ -5,18 +5,24 @@ the two teams, officials and on-air guests, then runs the clock, goals, cards,
 substitutions and penalty shootouts from one window during the match.
 
 I built it at FutureFrame (Lalitpur, Nepal) between 2025 and 2026, in Python
-with PySide6. The repository also holds two smaller pieces that grew around
-it: a sample fixtures server in Node.js and a web match-control dashboard in
-Next.js.
+with PySide6. Around it sit a match API in FastAPI, a web match-control
+dashboard in Next.js, and a sample fixtures server in Node.js.
 
 ## What's in here
 
 | Path | What it is |
 | --- | --- |
 | `main.py`, `src/`, `ui/` | The desktop app (PySide6). `src/` is the domain layer: models, services and an event bus. `ui/` is the Qt interface. |
-| `cloud-backend/` | Express server with sample tournaments, fixtures and teams. The desktop app's fixture loader can pull a match from it. |
+| `backend/` | FastAPI match API: matches, clock, events, stats, possession, penalty shootouts, fixtures and a WebSocket per match. The dashboard runs on it, and the desktop app pushes new matches and clock changes to it. |
 | `match-control-dashboard/` | Next.js dashboard for clock, events, stats and penalty shootouts in the browser. |
-| `tests/` | Service-level tests that run without the UI. |
+| `cloud-backend/` | Express server with sample tournaments, fixtures and teams, standing in for a league's fixtures service. It also accepts final results. |
+| `tests/` | Tests for the desktop services and the match API. |
+
+```
+desktop app ──┐                      ┌── fixtures server (cloud-backend, :3001)
+              ├──► match API (:8000) ┤
+dashboard ────┘   REST + WebSocket   └── Open-Meteo (match-day weather)
+```
 
 ## The desktop app
 
@@ -57,6 +63,41 @@ pytest                   # tests
 The operator PIN defaults to `2580`; change it from Tools > Set PIN, or set
 `FSP_DEFAULT_PIN`. There is no recovery PIN unless you set `FSP_MASTER_PIN`.
 
+## Match API
+
+```bash
+pip install -r backend/requirements.txt
+uvicorn backend.main:app --port 8000        # from the repository root
+```
+
+- Matches are kept in memory and written to `data/backend/matches.json` after
+  every change (set `FSP_BACKEND_DATA` to move it), so a restart doesn't lose
+  a live match. A clock that was running comes back paused.
+- Score and card counts are worked out from the event log, so undoing an
+  event always gives the right numbers.
+- Every change is pushed to `ws://localhost:8000/ws/matches/{id}` as the full
+  match state, and a running clock is pushed once a second.
+- Fixture and weather routes call the fixtures server (`FSP_CLOUD_URL`,
+  default `http://localhost:3001`) and Open-Meteo. The rest of the API works
+  without them.
+- Interactive docs are at `http://localhost:8000/docs`.
+
+## Match-control dashboard
+
+With the match API running:
+
+```bash
+cd match-control-dashboard
+npm install
+npm run dev              # http://localhost:3000
+```
+
+Load a fixture from the Fixtures page (needs the fixtures server), then run
+the match from Match Control. Set `NEXT_PUBLIC_API_URL` if the API isn't on
+`http://localhost:8000`. When the desktop app creates a match it appears on
+the dashboard too; set `FSP_BACKEND_URL` for the desktop app if the API runs
+elsewhere.
+
 ## Fixtures server
 
 ```bash
@@ -66,27 +107,16 @@ npm start                # http://localhost:3001
 ```
 
 `GET /api/tournaments`, `/api/fixtures`, `/api/fixtures/:id` and `/api/teams`
-return the sample data in `server.js`. The kit images in `assets/kits/` are
-plain generated shirts; club crests are not included.
-
-## Match-control dashboard
-
-```bash
-cd match-control-dashboard
-npm install
-npm run dev              # http://localhost:3000
-```
-
-The dashboard and the desktop app's live sync (`ui/backend_api.py`,
-`ui/backend_ws_client.py`) expect a match API at `http://localhost:8000`
-(set `NEXT_PUBLIC_API_URL` to change it). That API was a separate FastAPI
-service and is **not in this repository**, so without it the dashboard loads
-but can't create or update matches. The desktop app works on its own.
+return the sample data in `server.js`; `POST /api/fixtures/:id/result` stores
+a final result. The kit images in `assets/kits/` are plain generated shirts;
+club crests are not included.
 
 ## Notes
 
 - Sample data uses real club and player names for testing; no club artwork is
   included.
-- This is the code as it stood when I left the project, with a few fixes
-  applied afterwards (officials assignment, the demo, the recovery PIN, and
-  dependency updates in the dashboard). See the commit history.
+- The match API in `backend/` was rewritten after I left the project: the
+  original service was never committed, so I rebuilt it against the API the
+  dashboard and desktop app already call. Other later fixes (officials
+  assignment, the demo, the recovery PIN, dependency updates) are in the
+  commit history.
