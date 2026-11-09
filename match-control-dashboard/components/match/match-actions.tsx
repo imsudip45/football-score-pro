@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { AlertTriangle, Cloud, Flag, Loader2, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { fixturesApi } from "@/lib/api"
 
 export function MatchActions() {
   const { match, endMatch, deleteMatch } = useMatch()
@@ -61,13 +62,29 @@ export function MatchActions() {
   }
 
   const handleSync = async () => {
+    if (!match.fixture_id) {
+      toast({
+        title: "Nothing to sync",
+        description: "This match wasn't loaded from a fixture, so there is no fixture to send the result to.",
+        variant: "destructive",
+      })
+      return
+    }
     setSyncing(true)
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    const result = await fixturesApi.uploadResult(match.fixture_id)
     setSyncing(false)
-    toast({
-      title: "Synced to Cloud",
-      description: "Match data has been uploaded successfully.",
-    })
+    if (result.data?.success) {
+      toast({
+        title: "Synced to Cloud",
+        description: "The final result was sent to the fixtures server.",
+      })
+    } else {
+      toast({
+        title: "Sync failed",
+        description: result.error || "The fixtures server did not accept the result.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleDeleteMatch = async () => {

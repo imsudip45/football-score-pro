@@ -20,13 +20,11 @@ import {
   possessionApi,
   penaltiesApi,
   matchWebSocket,
+  BASE_URL as BACKEND_BASE_URL,
   type ClockState as ApiClockState,
   type BackendMatchState,
 } from "./api"
 
-const BACKEND_BASE_URL = typeof window !== "undefined"
-  ? ((window as any).__NEXT_PUBLIC_API_URL as string) ?? "http://localhost:8000"
-  : "http://localhost:8000"
 
 const normalizeAssetUrl = (url?: string | null): string => {
   if (!url) {

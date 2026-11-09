@@ -4,7 +4,7 @@
  */
 
 // Set NEXT_PUBLIC_API_URL to point the dashboard at a different match API
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface ApiResponse<T> {
   data: T | null;
@@ -690,6 +690,11 @@ export const fixturesApi = {
   // Get fixtures from local database
   async getLocalFixtures() {
     return apiGet<CloudFixture[]>('/fixtures');
+  },
+
+  // Send the final result of the latest match for a fixture to the fixtures server
+  async uploadResult(fixtureId: string) {
+    return apiPost<{ success: boolean; fixture_id: string }>(`/fixtures/upload/${encodeURIComponent(fixtureId)}`);
   },
 };
 

@@ -22,7 +22,7 @@ import {
 import { Calendar, MapPin, Trophy, Check, RefreshCw, Cloud, Loader2, Upload, Play, Clock, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useMatch } from "@/lib/match-context"
-import { fixturesApi, matchApi, type BackendMatch, type CloudFixture, type CloudTournament } from "@/lib/api"
+import { BASE_URL, fixturesApi, matchApi, type BackendMatch, type CloudFixture, type CloudTournament } from "@/lib/api"
 
 type LocalMatchSummary = {
   match: BackendMatch
@@ -77,8 +77,7 @@ export default function FixturesPage() {
   const handleUploadToCloud = async (fixture: CloudFixture) => {
     setUploadingFixture(fixture.id)
     try {
-      // Find match_id from loaded fixtures - we use the fixture id as match_id
-      const response = await fetch(`http://localhost:8000/fixtures/upload/${fixture.id}`, {
+      const response = await fetch(`${BASE_URL}/fixtures/upload/${fixture.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
