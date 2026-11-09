@@ -12,10 +12,12 @@
  * - GET /api/fixtures/:id - Get fixture details with teams and lineups
  * - GET /api/teams - List all teams
  * - GET /api/teams/:id - Get team with players
+ * - POST /api/fixtures/:id/result - Store a final result sent by the match API
  */
 
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -630,6 +632,13 @@ const fixtures = {
   }
 };
 
+// Club crests aren't shipped with this repo. Drop logo URLs whose file isn't
+// in assets/ so clients show their placeholder instead of a broken image.
+const assetExists = (url) => Boolean(url) && url.startsWith('/assets/') && fs.existsSync(path.join(__dirname, url));
+for (const item of [...Object.values(teams), ...Object.values(tournaments)]) {
+  if (!assetExists(item.logo_url)) item.logo_url = null;
+}
+
 // ============ API Routes ============
 
 // Health check
@@ -793,6 +802,21 @@ app.get('/api/fixtures/:id', (req, res) => {
       is_starting: false
     }))
   });
+});
+
+// Receive a final result from the local match API (POST /fixtures/upload/:id)
+app.post('/api/fixtures/:id/result', (req, res) => {
+  const fixture = fixtures[req.params.id];
+  if (!fixture) {
+    return res.status(404).json({ error: 'Fixture not found' });
+  }
+  const { home_score, away_score, status } = req.body || {};
+  if (!Number.isInteger(home_score) || !Number.isInteger(away_score)) {
+    return res.status(400).json({ error: 'home_score and away_score must be integers' });
+  }
+  fixture.result = { ...req.body, received_at: new Date().toISOString() };
+  fixture.status = status === 'finished' ? 'finished' : (status || fixture.status);
+  res.json({ id: fixture.id, status: fixture.status, result: fixture.result });
 });
 
 // List all teams
