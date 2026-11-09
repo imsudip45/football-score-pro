@@ -3,6 +3,8 @@ New Backend API Client for Desktop App.
 Connects to the FastAPI backend at localhost:8000.
 """
 
+import os
+
 import requests
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
@@ -10,7 +12,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = os.environ.get("FSP_BACKEND_URL", "http://127.0.0.1:8000")
+# Keep the UI responsive if the backend hangs
+TIMEOUT = 5
 
 
 @dataclass
@@ -46,7 +50,7 @@ class BackendAPI:
     
     def _get(self, path: str) -> Optional[Dict[str, Any]]:
         try:
-            resp = self.session.get(self._url(path))
+            resp = self.session.get(self._url(path), timeout=TIMEOUT)
             resp.raise_for_status()
             return resp.json()
         except requests.RequestException as e:
@@ -55,7 +59,7 @@ class BackendAPI:
     
     def _post(self, path: str, data: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         try:
-            resp = self.session.post(self._url(path), json=data or {})
+            resp = self.session.post(self._url(path), json=data or {}, timeout=TIMEOUT)
             resp.raise_for_status()
             return resp.json()
         except requests.RequestException as e:
@@ -64,7 +68,7 @@ class BackendAPI:
     
     def _delete(self, path: str) -> bool:
         try:
-            resp = self.session.delete(self._url(path))
+            resp = self.session.delete(self._url(path), timeout=TIMEOUT)
             resp.raise_for_status()
             return True
         except requests.RequestException as e:
@@ -76,9 +80,9 @@ class BackendAPI:
     def health_check(self) -> bool:
         """Check if backend is running."""
         try:
-            resp = self.session.get(self._url("/"))
+            resp = self.session.get(self._url("/"), timeout=2)
             return resp.status_code == 200
-        except:
+        except requests.RequestException:
             return False
     
     # ============ Match Management ============
